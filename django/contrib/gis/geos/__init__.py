@@ -20,6 +20,7 @@ if HAS_GEOS:
     from .error import GEOSException, GEOSIndexError
     from .io import WKTReader, WKTWriter, WKBReader, WKBWriter
     from .factory import fromfile, fromstr
+    from .misc import polygonize
 
     __all__ += [
         'GEOSGeometry', 'wkt_regex', 'hex_regex', 'Point', 'LineString',
@@ -27,4 +28,5 @@ if HAS_GEOS:
         'MultiLineString', 'MultiPolygon', 'GEOSException', 'GEOSIndexError',
         'WKTReader', 'WKTWriter', 'WKBReader', 'WKBWriter', 'fromfile',
         'fromstr',
+        'polygonize',
     ]
