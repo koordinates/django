@@ -12,3 +12,4 @@ from django.contrib.gis.geos.error import GEOSException, GEOSIndexError
 from django.contrib.gis.geos.io import WKTReader, WKTWriter, WKBReader, WKBWriter
 from django.contrib.gis.geos.factory import fromfile, fromstr
 from django.contrib.gis.geos.libgeos import geos_version, geos_version_info, GEOS_PREPARE
+from django.contrib.gis.geos.misc import polygonize
