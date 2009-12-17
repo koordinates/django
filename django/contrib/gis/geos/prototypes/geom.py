@@ -97,6 +97,9 @@ create_polygon = GeomOutput('GEOSGeom_createPolygon', None)
 create_empty_polygon = GeomOutput('GEOSGeom_createEmptyPolygon', None)
 create_collection = GeomOutput('GEOSGeom_createCollection', None)
 
+# Polygonizer
+polygonize = GeomOutput('GEOSPolygonize', None)
+
 # Ring routines
 get_extring = GeomOutput('GEOSGetExteriorRing', [GEOM_PTR])
 get_intring = GeomOutput('GEOSGetInteriorRingN', [GEOM_PTR, c_int])
