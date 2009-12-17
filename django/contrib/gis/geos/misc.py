@@ -1,5 +1,5 @@
 from ctypes import c_uint, byref
-from django.contrib.gis.geos.base import GEOSGeometry
+from django.contrib.gis.geos.geometry import GEOSGeometry
 from django.contrib.gis.geos.libgeos import get_pointer_arr
 from django.contrib.gis.geos.prototypes import geom
 
