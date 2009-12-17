@@ -1,6 +1,6 @@
 """
 The GeoDjango GEOS module.  Please consult the GeoDjango documentation
-for more details: 
+for more details:
   http://geodjango.org/docs/geos.html
 """
 try:
@@ -18,3 +18,4 @@ if HAS_GEOS:
     from .error import GEOSException, GEOSIndexError
     from .io import WKTReader, WKTWriter, WKBReader, WKBWriter
     from .factory import fromfile, fromstr
+    from .misc import polygonize
