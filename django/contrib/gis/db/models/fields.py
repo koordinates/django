@@ -231,7 +231,7 @@ class GeometryField(GeoSelectFormatMixin, Field):
         has no SRID, then that of the field will be returned.
         """
         gsrid = geom.srid  # SRID of given geometry.
-        if gsrid is None or self.srid == -1 or (gsrid == -1 and self.srid != -1):
+        if gsrid is None or gsrid == -1:
             return self.srid
         else:
             return gsrid
