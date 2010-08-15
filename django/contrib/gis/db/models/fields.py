@@ -169,7 +169,7 @@ class BaseSpatialField(Field):
         returned.
         """
         srid = obj.srid  # SRID of given geometry.
-        if srid is None or self.srid == -1 or (srid == -1 and self.srid != -1):
+        if srid is None or srid <= 0:
             return self.srid
         else:
             return srid
