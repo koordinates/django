@@ -374,7 +374,7 @@ class PostGISOperations(DatabaseOperations, BaseSpatialOperations):
         SRID of the field.  Specifically, this routine will substitute in the
         ST_Transform() function call.
         """
-        if value is None or value.srid == f.srid:
+        if value is None or value.srid == f.srid or f.srid <= 0:
             placeholder = '%s'
         else:
             # Adding Transform() to the SQL placeholder.
