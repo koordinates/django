@@ -1,5 +1,6 @@
 from ctypes import c_void_p
 
+from django.conf import settings
 from django.contrib.gis.geos.error import GEOSException
 
 # Trying to import GDAL libraries, if available.  Have to place in
@@ -12,11 +13,13 @@ except ImportError:
         HAS_GDAL = False
     gdal = GDALInfo()
 
-# NumPy supported?
-try:
-    import numpy
-except ImportError:
-    numpy = False
+numpy = False
+if getattr(settings, 'DJANGO_GIS_NUMPY', True):
+    # NumPy supported?
+    try:
+        import numpy
+    except ImportError:
+        pass
 
 
 class GEOSBase(object):
