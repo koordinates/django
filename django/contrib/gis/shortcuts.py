@@ -5,11 +5,14 @@ from django.conf import settings
 from django.http import HttpResponse
 from django.template import loader
 
-# NumPy supported?
-try:
-    import numpy
-except ImportError:
-    numpy = False
+
+numpy = False
+if getattr(settings, 'DJANGO_GIS_NUMPY', True):
+    # NumPy supported?
+    try:
+        import numpy
+    except ImportError:
+        numpy = False
 
 
 def compress_kml(kml):
