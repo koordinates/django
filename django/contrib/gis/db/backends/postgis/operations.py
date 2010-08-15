@@ -288,7 +288,7 @@ class PostGISOperations(BaseSpatialOperations, DatabaseOperations):
 
         # Adding Transform() to the SQL placeholder if the value srid
         # is not equal to the field srid.
-        if value_srid is None or value_srid == f.srid:
+        if value_srid is None or value_srid == f.srid or f.srid <= 0:
             placeholder = '%s'
         else:
             placeholder = '%s(%%s, %s)' % (transform_func, f.srid)
