@@ -92,7 +92,7 @@ create_polygon = geom_output(GEOSFunc('GEOSGeom_createPolygon'), None)
 create_collection = geom_output(GEOSFunc('GEOSGeom_createCollection'), None)
 
 #Polygonizer
-polygonize = geom_output(lgeos.GEOSPolygonize, None)
+polygonize = geom_output(GEOSFunc('GEOSPolygonize'), None)
 
 # Ring routines
 get_extring = geom_output(GEOSFunc('GEOSGetExteriorRing'), [GEOM_PTR])
