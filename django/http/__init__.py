@@ -261,7 +261,7 @@ class HttpRequest(object):
 
     def _load_post_and_files(self):
         # Populates self._post and self._files
-        if self.method != 'POST':
+        if self.method == 'GET':
             self._post, self._files = QueryDict('', encoding=self._encoding), MultiValueDict()
             return
         if self._read_started and not hasattr(self, '_raw_post_data'):
