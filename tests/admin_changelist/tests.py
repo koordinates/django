@@ -24,11 +24,25 @@ from .models import (Event, Child, Parent, Genre, Band, Musician, Group,
     UnorderedObject, OrderedObject, CustomIdUser)
 
 
+class MockRequest(object):
+    GET = {}
+
+    def __init__(self):
+        self.user = User(is_staff=True, is_superuser=False)
+
+
 class ChangeListTests(TestCase):
     urls = "admin_changelist.urls"
 
     def setUp(self):
-        self.factory = RequestFactory()
+        staff = User(is_staff=True)
+
+        class StaffRequestFactory(RequestFactory):
+            def request(slf, *args, **kwargs):
+                r = super(StaffRequestFactory, slf).request(*args, **kwargs)
+                r.user = staff
+                return r
+        self.factory = StaffRequestFactory()
 
     def _create_superuser(self, username):
         return User.objects.create(username=username, is_superuser=True)

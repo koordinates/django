@@ -7,7 +7,7 @@ import datetime
 
 from django.conf import settings, global_settings
 from django.core import mail
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
 from django.core.files import temp as tempfile
 from django.core.urlresolvers import get_script_prefix, reverse, set_script_prefix
 # Register auth models with the admin.
@@ -52,7 +52,7 @@ from .models import (Article, BarAccount, CustomArticle, EmptyModel, FooAccount,
     OtherStory, ComplexSortedPerson, PluggableSearchPerson, Parent, Child, AdminOrderedField,
     AdminOrderedModelMethod, AdminOrderedAdminMethod, AdminOrderedCallable,
     Report, MainPrepopulated, RelatedPrepopulated, UnorderedObject,
-    Simple, UndeletableObject, Choice, ShortMessage, Telegram, Pizza, Topping)
+    Simple, UndeletableObject, Choice, ShortMessage, Telegram, Pizza, Topping, Thing)
 from .admin import site, site2
 
 
@@ -551,90 +551,6 @@ class AdminViewBasicTest(AdminViewBasicTestCase):
                 self.assertNotContains(response, '%d.%m.%Y %H:%M:%S')
                 self.assertContains(response, '%Y-%m-%d %H:%M:%S')
 
-    def test_disallowed_filtering(self):
-        with patch_logger('django.security.DisallowedModelAdminLookup', 'error') as calls:
-            response = self.client.get("/test_admin/admin/admin_views/album/?owner__email__startswith=fuzzy")
-            self.assertEqual(response.status_code, 400)
-            self.assertEqual(len(calls), 1)
-
-        # Filters are allowed if explicitly included in list_filter
-        response = self.client.get("/test_admin/admin/admin_views/thing/?color__value__startswith=red")
-        self.assertEqual(response.status_code, 200)
-        response = self.client.get("/test_admin/admin/admin_views/thing/?color__value=red")
-        self.assertEqual(response.status_code, 200)
-
-        # Filters should be allowed if they involve a local field without the
-        # need to whitelist them in list_filter or date_hierarchy.
-        response = self.client.get("/test_admin/admin/admin_views/person/?age__gt=30")
-        self.assertEqual(response.status_code, 200)
-
-        e1 = Employee.objects.create(name='Anonymous', gender=1, age=22, alive=True, code='123')
-        e2 = Employee.objects.create(name='Visitor', gender=2, age=19, alive=True, code='124')
-        WorkHour.objects.create(datum=datetime.datetime.now(), employee=e1)
-        WorkHour.objects.create(datum=datetime.datetime.now(), employee=e2)
-        response = self.client.get("/test_admin/admin/admin_views/workhour/")
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'employee__person_ptr__exact')
-        response = self.client.get("/test_admin/admin/admin_views/workhour/?employee__person_ptr__exact=%d" % e1.pk)
-        self.assertEqual(response.status_code, 200)
-
-    def test_disallowed_to_field(self):
-        with patch_logger('django.security.DisallowedModelAdminToField', 'error') as calls:
-            response = self.client.get("/test_admin/admin/admin_views/section/", {TO_FIELD_VAR: 'missing_field'})
-            self.assertEqual(response.status_code, 400)
-            self.assertEqual(len(calls), 1)
-
-        # Specifying a field that is not refered by any other model registered
-        # to this admin site should raise an exception.
-        with patch_logger('django.security.DisallowedModelAdminToField', 'error') as calls:
-            response = self.client.get("/test_admin/admin/admin_views/section/", {TO_FIELD_VAR: 'name'})
-            self.assertEqual(response.status_code, 400)
-            self.assertEqual(len(calls), 1)
-
-        # #23839 - Primary key should always be allowed, even if the referenced model isn't registered.
-        response = self.client.get("/test_admin/admin/admin_views/notreferenced/", {TO_FIELD_VAR: 'id'})
-        self.assertEqual(response.status_code, 200)
-
-        # Specifying a field referenced by another model though a m2m should be allowed.
-        # XXX: We're not testing against a non-primary key field since the admin doesn't
-        # support it yet, ref #23862
-        response = self.client.get("/test_admin/admin/admin_views/recipe/", {TO_FIELD_VAR: 'id'})
-        self.assertEqual(response.status_code, 200)
-
-        # #23604 - Specifying a field referenced through a reverse m2m relationship should be allowed.
-        # XXX: We're not testing against a non-primary key field since the admin doesn't
-        # support it yet, ref #23862
-        response = self.client.get("/test_admin/admin/admin_views/ingredient/", {TO_FIELD_VAR: 'id'})
-        self.assertEqual(response.status_code, 200)
-
-        # #23329 - Specifying a field that is not refered by any other model directly registered
-        # to this admin site but registered through inheritance should be allowed.
-        response = self.client.get("/test_admin/admin/admin_views/referencedbyparent/", {TO_FIELD_VAR: 'name'})
-        self.assertEqual(response.status_code, 200)
-
-        # #23431 - Specifying a field that is only refered to by a inline of a registered
-        # model should be allowed.
-        response = self.client.get("/test_admin/admin/admin_views/referencedbyinline/", {TO_FIELD_VAR: 'name'})
-        self.assertEqual(response.status_code, 200)
-
-    def test_allowed_filtering_15103(self):
-        """
-        Regressions test for ticket 15103 - filtering on fields defined in a
-        ForeignKey 'limit_choices_to' should be allowed, otherwise raw_id_fields
-        can break.
-        """
-        # Filters should be allowed if they are defined on a ForeignKey pointing to this model
-        response = self.client.get("/test_admin/admin/admin_views/inquisition/?leader__name=Palin&leader__age=27")
-        self.assertEqual(response.status_code, 200)
-
-    def test_popup_dismiss_related(self):
-        """
-        Regression test for ticket 20664 - ensure the pk is properly quoted.
-        """
-        actor = Actor.objects.create(name="Palin", age=27)
-        response = self.client.get("/test_admin/admin/admin_views/actor/?%s" % IS_POPUP_VAR)
-        self.assertContains(response, "opener.dismissRelatedLookupPopup(window, &#39;%s&#39;)" % actor.pk)
-
     def test_hide_change_password(self):
         """
         Tests if the "change password" link in the admin is hidden if the User
@@ -911,6 +827,14 @@ class AdminViewPermissionsTest(TestCase):
 
         delete_user.user_permissions.add(get_perm(Section,
             get_permission_codename('delete', Section._meta)))
+
+        # Permissions for other models, for tests:
+        #  - test_disallowed_filtering
+        #  - test_allowed_filtering_15103
+        change_user.user_permissions.add(get_perm(Inquisition,
+            Inquisition._meta.get_change_permission()))
+        change_user.user_permissions.add(get_perm(Thing,
+            Thing._meta.get_change_permission()))
 
         # login POST dicts
         self.super_login = {
@@ -1344,6 +1268,44 @@ class AdminViewPermissionsTest(TestCase):
 
         response = self.client.get('/test_admin/admin/secure-view/')
         self.assertContains(response, 'id="login-form"')
+
+    def test_disallowed_filtering(self):
+        """
+        Ensure cross-model querystring lookups are disallowed for non-superusers.
+        """
+        self.client.login(username='changeuser', password='secret')
+        self.assertRaises(SuspiciousOperation,
+            self.client.get, "/test_admin/admin/admin_views/article/?section__name__startswith=fuzzy"
+        )
+
+        try:
+            self.client.get("/test_admin/admin/admin_views/article/?title__startswith=fuzzy")
+        except SuspiciousOperation:
+            self.fail("Filters should be allowed if they involve a local field without the need to whitelist them in list_filter or date_hierarchy.")
+
+        try:
+            self.client.get("/test_admin/admin/admin_views/thing/?color__value__startswith=red")
+            self.client.get("/test_admin/admin/admin_views/thing/?color__value=red")
+        except SuspiciousOperation:
+            self.fail("Filters are allowed if explicitly included in list_filter")
+
+        self.client.login(username='super', password='secret')
+        try:
+            self.client.get("/test_admin/admin/admin_views/article/?section__name__startswith=fuzzy")
+        except SuspiciousOperation:
+            self.fail("Filters should be allowed for superusers.")
+
+    def test_allowed_filtering_15103(self):
+        """
+        Regressions test for ticket 15103 - filtering on fields defined in a
+        ForeignKey 'limit_choices_to' should be allowed, otherwise raw_id_fields
+        can break.
+        """
+        self.client.login(username='changeuser', password='secret')
+        try:
+            self.client.get("/test_admin/admin/admin_views/inquisition/?leader__name=Palin&leader__age=27")
+        except SuspiciousOperation:
+            self.fail("Filters should be allowed if they are defined on a ForeignKey pointing to this model")
 
 
 @override_settings(PASSWORD_HASHERS=('django.contrib.auth.hashers.SHA1PasswordHasher',))

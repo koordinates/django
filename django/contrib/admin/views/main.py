@@ -82,6 +82,7 @@ class ChangeList(six.with_metaclass(RenameChangeListMethods)):
         self.list_max_show_all = list_max_show_all
         self.model_admin = model_admin
         self.preserved_filters = model_admin.get_preserved_filters(request)
+        self.allow_all_lookups = request.user.is_superuser
 
         # Get search parameters from the query string.
         try:
@@ -154,7 +155,7 @@ class ChangeList(six.with_metaclass(RenameChangeListMethods)):
                 del lookup_params[key]
                 lookup_params[force_str(key)] = value
 
-            if not self.model_admin.lookup_allowed(key, value):
+            if not (self.allow_all_lookups or self.model_admin.lookup_allowed(key, value)):
                 raise DisallowedModelAdminLookup("Filtering by %s not allowed" % key)
 
         filter_specs = []

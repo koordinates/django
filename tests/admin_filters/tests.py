@@ -149,7 +149,14 @@ class ListFiltersTests(TestCase):
             self.next_month = self.today.replace(month=self.today.month + 1, day=1)
         self.next_year = self.today.replace(year=self.today.year + 1, month=1, day=1)
 
-        self.request_factory = RequestFactory()
+        self.staff = User(is_staff=True, is_superuser=False)
+
+        class StaffRequestFactory(RequestFactory):
+            def request(slf, *args, **kwargs):
+                r = super(StaffRequestFactory, slf).request(*args, **kwargs)
+                r.user = self.staff
+                return r
+        self.request_factory = StaffRequestFactory()
 
         # Users
         self.alfred = User.objects.create_user('alfred', 'alfred@example.com')
