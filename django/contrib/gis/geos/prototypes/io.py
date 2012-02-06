@@ -105,7 +105,11 @@ class IOBase(GEOSBase):
 
     def __del__(self):
         # Cleaning up with the appropriate destructor.
-        if self._ptr: self._destructor(self._ptr)
+        try:
+            if self._ptr: self._destructor(self._ptr)
+        except TypeError:
+            # Thread is dying, rest in peace.
+            pass
 
 ### Base WKB/WKT Reading and Writing objects ###
 
