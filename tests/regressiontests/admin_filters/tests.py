@@ -125,7 +125,14 @@ class ListFiltersTests(TestCase):
         self.tomorrow = self.today + datetime.timedelta(days=1)
         self.one_week_ago = self.today - datetime.timedelta(days=7)
 
-        self.request_factory = RequestFactory()
+        self.staff = User(is_staff=True, is_superuser=False)
+
+        class StaffRequestFactory(RequestFactory):
+            def request(slf, *args, **kwargs):
+                r = super(StaffRequestFactory, slf).request(*args, **kwargs)
+                r.user = self.staff
+                return r
+        self.request_factory = StaffRequestFactory()
 
         # Users
         self.alfred = User.objects.create_user('alfred', 'alfred@example.com')

@@ -50,6 +50,7 @@ class ChangeList(object):
         self.list_per_page = list_per_page
         self.list_max_show_all = list_max_show_all
         self.model_admin = model_admin
+        self.allow_all_lookups = request.user.is_superuser
 
         # Get search parameters from the query string.
         try:
@@ -97,7 +98,7 @@ class ChangeList(object):
                 del lookup_params[key]
                 lookup_params[force_str(key)] = value
 
-            if not self.model_admin.lookup_allowed(key, value):
+            if not (self.allow_all_lookups or self.model_admin.lookup_allowed(key, value)):
                 raise SuspiciousOperation("Filtering by %s not allowed" % key)
 
         filter_specs = []
