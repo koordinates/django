@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.auth.models import User
 from django.contrib.admin.options import IncorrectLookupParameters
 from django.contrib.admin.views.main import ChangeList, SEARCH_VAR
 from django.core.paginator import Paginator
@@ -324,7 +325,6 @@ class FilteredChildAdmin(admin.ModelAdmin):
 class MockRequest(object):
     GET = {}
     def __init__(self):
-        from django.contrib.auth.models import User
         self.user = User(is_staff=True, is_superuser=False)
 
 class CustomPaginator(Paginator):
@@ -348,7 +348,9 @@ class ChordsBandAdmin(admin.ModelAdmin):
 class MockFilterRequest(object):
     def __init__(self, filter, q):
         self.GET = {filter: q}
+        self.user = User(is_staff=True, is_superuser=False)
 
 class MockSearchRequest(object):
     def __init__(self, q):
         self.GET = {SEARCH_VAR: q}
+        self.user = User(is_staff=True, is_superuser=False)
