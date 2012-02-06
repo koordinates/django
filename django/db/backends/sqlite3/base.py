@@ -261,6 +261,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         self.creation = DatabaseCreation(self)
         self.introspection = DatabaseIntrospection(self)
         self.validation = BaseDatabaseValidation(self)
+        self._cursors = []
 
     def _sqlite_create_connection(self):
         settings_dict = self.settings_dict
@@ -300,7 +301,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def _cursor(self):
         if self.connection is None:
             self._sqlite_create_connection()
-        return self.connection.cursor(factory=SQLiteCursorWrapper)
+        cursor = self.connection.cursor(factory=SQLiteCursorWrapper)
+        self._cursors.append(cursor)
+        return cursor
 
     def check_constraints(self, table_names=None):
         """
@@ -342,6 +345,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         # database. To prevent accidental data loss, ignore close requests on
         # an in-memory db.
         if self.settings_dict['NAME'] != ":memory:":
+            for c in self._cursors:
+                try:
+                    c.close()
+                except Database.Error:
+                    pass
             BaseDatabaseWrapper.close(self)
 
 FORMAT_QMARK_REGEX = re.compile(r'(?<!%)%s')
