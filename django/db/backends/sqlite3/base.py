@@ -96,10 +96,10 @@ class DatabaseOperations(BaseDatabaseOperations):
         # It would be more straightforward if we could use the sqlite strftime
         # function, but it does not allow for keeping six digits of fractional
         # second information, nor does it allow for formatting date and datetime
-        # values differently. So instead we register our own function that 
-        # formats the datetime combined with the delta in a manner suitable 
+        # values differently. So instead we register our own function that
+        # formats the datetime combined with the delta in a manner suitable
         # for comparisons.
-        return  u'django_format_dtdelta(%s, "%s", "%d", "%d", "%d")' % (sql, 
+        return  u'django_format_dtdelta(%s, "%s", "%d", "%d", "%d")' % (sql,
             connector, timedelta.days, timedelta.seconds, timedelta.microseconds)
 
     def date_trunc_sql(self, lookup_type, field_name):
@@ -192,6 +192,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         self.creation = DatabaseCreation(self)
         self.introspection = DatabaseIntrospection(self)
         self.validation = BaseDatabaseValidation(self)
+        self._cursors = []
 
     def _cursor(self):
         if self.connection is None:
@@ -211,7 +212,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             self.connection.create_function("regexp", 2, _sqlite_regexp)
             self.connection.create_function("django_format_dtdelta", 5, _sqlite_format_dtdelta)
             connection_created.send(sender=self.__class__, connection=self)
-        return self.connection.cursor(factory=SQLiteCursorWrapper)
+        cursor = self.connection.cursor(factory=SQLiteCursorWrapper)
+        self._cursors.append(cursor)
+        return cursor
 
     def close(self):
         # If database is in memory, closing the connection destroys the
@@ -219,6 +222,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         # an in-memory db.
         if self.settings_dict['NAME'] != ":memory:":
             BaseDatabaseWrapper.close(self)
+            for c in self._cursors:
+                try:
+                    c.close()
+                except Database.Error:
+                    pass
 
 FORMAT_QMARK_REGEX = re.compile(r'(?<!%)%s')
 
