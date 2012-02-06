@@ -323,6 +323,9 @@ class FilteredChildAdmin(admin.ModelAdmin):
 
 class MockRequest(object):
     GET = {}
+    def __init__(self):
+        from django.contrib.auth.models import User
+        self.user = User(is_staff=True, is_superuser=False)
 
 class CustomPaginator(Paginator):
     def __init__(self, queryset, page_size, orphans=0, allow_empty_first_page=True):

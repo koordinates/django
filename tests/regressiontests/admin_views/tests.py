@@ -35,7 +35,7 @@ from models import (Article, BarAccount, CustomArticle, EmptyModel,
     Person, Persona, Picture, Podcast, Section, Subscriber, Vodcast,
     Language, Collector, Widget, Grommet, DooHickey, FancyDoodad, Whatsit,
     Category, Post, Plot, FunkyTag, Chapter, Book, Promo, WorkHour, Employee,
-    Question, Answer, Inquisition, Actor, FoodDelivery,
+    Question, Answer, Inquisition, Actor, Thing, FoodDelivery,
     RowLevelChangePermissionModel, Paper, CoverLetter, Story, OtherStory)
 
 
@@ -394,23 +394,7 @@ class AdminViewBasicTest(TestCase):
         finally:
             deactivate()
 
-
-    def test_disallowed_filtering(self):
-        self.assertRaises(SuspiciousOperation,
-            self.client.get, "/test_admin/admin/admin_views/album/?owner__email__startswith=fuzzy"
-        )
-
-        try:
-            self.client.get("/test_admin/admin/admin_views/thing/?color__value__startswith=red")
-            self.client.get("/test_admin/admin/admin_views/thing/?color__value=red")
-        except SuspiciousOperation:
-            self.fail("Filters are allowed if explicitly included in list_filter")
-
-        try:
-            self.client.get("/test_admin/admin/admin_views/person/?age__gt=30")
-        except SuspiciousOperation:
-            self.fail("Filters should be allowed if they involve a local field without the need to whitelist them in list_filter or date_hierarchy.")
-
+    def test_allowed_filtering(self):
         e1 = Employee.objects.create(name='Anonymous', gender=1, age=22, alive=True, code='123')
         e2 = Employee.objects.create(name='Visitor', gender=2, age=19, alive=True, code='124')
         WorkHour.objects.create(datum=datetime.datetime.now(), employee=e1)
@@ -420,17 +404,6 @@ class AdminViewBasicTest(TestCase):
         self.assertContains(response, 'employee__person_ptr__exact')
         response = self.client.get("/test_admin/admin/admin_views/workhour/?employee__person_ptr__exact=%d" % e1.pk)
         self.assertEqual(response.status_code, 200)
-
-    def test_allowed_filtering_15103(self):
-        """
-        Regressions test for ticket 15103 - filtering on fields defined in a
-        ForeignKey 'limit_choices_to' should be allowed, otherwise raw_id_fields
-        can break.
-        """
-        try:
-            self.client.get("/test_admin/admin/admin_views/inquisition/?leader__name=Palin&leader__age=27")
-        except SuspiciousOperation:
-            self.fail("Filters should be allowed if they are defined on a ForeignKey pointing to this model")
 
 class AdminJavaScriptTest(AdminViewBasicTest):
     def testSingleWidgetFirsFieldFocus(self):
@@ -565,6 +538,14 @@ class AdminViewPermissionsTest(TestCase):
 
         delete_user.user_permissions.add(get_perm(Section,
             Section._meta.get_delete_permission()))
+
+        # Permissions for other models, for tests:
+        #  - test_disallowed_filtering
+        #  - test_allowed_filtering_15103
+        change_user.user_permissions.add(get_perm(Inquisition,
+            Inquisition._meta.get_change_permission()))
+        change_user.user_permissions.add(get_perm(Thing,
+            Thing._meta.get_change_permission()))
 
         # login POST dicts
         self.super_login = {
@@ -936,6 +917,44 @@ class AdminViewPermissionsTest(TestCase):
 
         response = self.client.get('/test_admin/admin/secure-view/')
         self.assertContains(response, 'id="login-form"')
+
+    def test_disallowed_filtering(self):
+        """
+        Ensure cross-model querystring lookups are disallowed for non-superusers.
+        """
+        self.client.login(username='changeuser', password='secret')
+        self.assertRaises(SuspiciousOperation,
+            self.client.get, "/test_admin/admin/admin_views/article/?section__name__startswith=fuzzy"
+        )
+
+        try:
+            self.client.get("/test_admin/admin/admin_views/article/?title__startswith=fuzzy")
+        except SuspiciousOperation:
+            self.fail("Filters should be allowed if they involve a local field without the need to whitelist them in list_filter or date_hierarchy.")
+
+        try:
+            self.client.get("/test_admin/admin/admin_views/thing/?color__value__startswith=red")
+            self.client.get("/test_admin/admin/admin_views/thing/?color__value=red")
+        except SuspiciousOperation:
+            self.fail("Filters are allowed if explicitly included in list_filter")
+
+        self.client.login(username='super', password='secret')
+        try:
+            self.client.get("/test_admin/admin/admin_views/article/?section__name__startswith=fuzzy")
+        except SuspiciousOperation:
+            self.fail("Filters should be allowed for superusers.")
+
+    def test_allowed_filtering_15103(self):
+        """
+        Regressions test for ticket 15103 - filtering on fields defined in a
+        ForeignKey 'limit_choices_to' should be allowed, otherwise raw_id_fields
+        can break.
+        """
+        self.client.login(username='changeuser', password='secret')
+        try:
+            self.client.get("/test_admin/admin/admin_views/inquisition/?leader__name=Palin&leader__age=27")
+        except SuspiciousOperation:
+            self.fail("Filters should be allowed if they are defined on a ForeignKey pointing to this model")
 
 
 class AdminViewDeletedObjectsTest(TestCase):

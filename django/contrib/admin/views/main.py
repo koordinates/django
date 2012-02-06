@@ -49,6 +49,7 @@ class ChangeList(object):
         self.list_select_related = list_select_related
         self.list_per_page = list_per_page
         self.model_admin = model_admin
+        self.allow_all_lookups = request.user.is_superuser
 
         # Get search parameters from the query string.
         try:
@@ -213,7 +214,7 @@ class ChangeList(object):
                     value = True
                 lookup_params[key] = value
 
-            if not self.model_admin.lookup_allowed(key, value):
+            if not (self.allow_all_lookups or self.model_admin.lookup_allowed(key, value)):
                 raise SuspiciousOperation(
                     "Filtering by %s not allowed" % key
                 )
