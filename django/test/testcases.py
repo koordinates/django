@@ -256,6 +256,11 @@ class TransactionTestCase(ut2.TestCase):
               ROOT_URLCONF with it.
             * Clearing the mail test outbox.
         """
+        # hack:
+        # django only calls connection.features.confirm() during test db creation,
+        # but our test runner doesn't create a test db, so we have to do this here instead.
+        # see https://code.djangoproject.com/ticket/17760
+        connection.features.confirm()
         self._fixture_setup()
         self._urlconf_setup()
         mail.outbox = []
