@@ -27,11 +27,18 @@ class Serializer(base.Serializer):
         self._current = {}
 
     def end_object(self, obj):
-        self.objects.append({
-            "model"  : smart_unicode(obj._meta),
-            "pk"     : smart_unicode(obj._get_pk_val(), strings_only=True),
-            "fields" : self._current
-        })
+        if not self.use_natural_primary_keys or not hasattr(obj, 'natural_key'):
+            data = {
+                "model": smart_unicode(obj._meta),
+                "pk": smart_unicode(obj._get_pk_val(), strings_only=True),
+                "fields": self._current,
+            }
+        else:
+            data = {
+                "model": smart_unicode(obj._meta),
+                "fields": self._current
+            }
+        self.objects.append(data)
         self._current = None
 
     def handle_field(self, obj, field):
@@ -47,7 +54,7 @@ class Serializer(base.Serializer):
     def handle_fk_field(self, obj, field):
         related = getattr(obj, field.name)
         if related is not None:
-            if self.use_natural_keys and hasattr(related, 'natural_key'):
+            if self.use_natural_foreign_keys and hasattr(related, 'natural_key'):
                 related = related.natural_key()
             else:
                 if field.rel.field_name == related._meta.pk.name:
@@ -60,7 +67,7 @@ class Serializer(base.Serializer):
 
     def handle_m2m_field(self, obj, field):
         if field.rel.through._meta.auto_created:
-            if self.use_natural_keys and hasattr(field.rel.to, 'natural_key'):
+            if self.use_natural_foreign_keys and hasattr(field.rel.to, 'natural_key'):
                 m2m_value = lambda value: value.natural_key()
             else:
                 m2m_value = lambda value: smart_unicode(value._get_pk_val(), strings_only=True)
@@ -82,7 +89,9 @@ def Deserializer(object_list, **options):
     for d in object_list:
         # Look up the model and starting build a dict of data for it.
         Model = _get_model(d["model"])
-        data = {Model._meta.pk.attname : Model._meta.pk.to_python(d["pk"])}
+        data = {}
+        if 'pk' in d:
+            data[Model._meta.pk.attname] = Model._meta.pk.to_python(d['pk'])
         m2m_data = {}
 
         # Handle each field
@@ -127,7 +136,9 @@ def Deserializer(object_list, **options):
             else:
                 data[field.name] = field.to_python(field_value)
 
-        yield base.DeserializedObject(Model(**data), m2m_data)
+        obj = base.build_instance(Model, data, db)
+
+        yield base.DeserializedObject(obj, m2m_data)
 
 def _get_model(model_identifier):
     """

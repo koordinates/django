@@ -451,12 +451,13 @@ class NaturalKeyFixtureTests(TestCase):
             'fixtures_regress.store',
             verbosity=0,
             format='json',
-            use_natural_keys=True,
+            use_natural_foreign_keys=True,
+            use_natural_primary_keys=True,
             stdout=stdout,
         )
         self.assertEqual(
             stdout.getvalue(),
-            """[{"pk": 2, "model": "fixtures_regress.store", "fields": {"name": "Amazon"}}, {"pk": 3, "model": "fixtures_regress.store", "fields": {"name": "Borders"}}, {"pk": 4, "model": "fixtures_regress.person", "fields": {"name": "Neal Stephenson"}}, {"pk": 1, "model": "fixtures_regress.book", "fields": {"stores": [["Amazon"], ["Borders"]], "name": "Cryptonomicon", "author": ["Neal Stephenson"]}}]"""
+            """[{"fields": {"name": "Amazon"}, "model": "fixtures_regress.store"}, {"fields": {"name": "Borders"}, "model": "fixtures_regress.store"}, {"fields": {"name": "Neal Stephenson"}, "model": "fixtures_regress.person"}, {"pk": 1, "model": "fixtures_regress.book", "fields": {"stores": [["Amazon"], ["Borders"]], "name": "Cryptonomicon", "author": ["Neal Stephenson"]}}]"""
         )
 
     def test_dependency_sorting(self):

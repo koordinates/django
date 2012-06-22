@@ -42,16 +42,12 @@ class Serializer(base.Serializer):
             raise base.SerializationError("Non-model object (%s) encountered during serialization" % type(obj))
 
         self.indent(1)
-        obj_pk = obj._get_pk_val()
-        if obj_pk is None:
-            attrs = {"model": smart_unicode(obj._meta),}
-        else:
-            attrs = {
-                "pk": smart_unicode(obj._get_pk_val()),
-                "model": smart_unicode(obj._meta),
-            }
-
-        self.xml.startElement("object", attrs)
+        object_data = {"model": smart_unicode(obj._meta)}
+        if not self.use_natural_primary_keys or not hasattr(obj, 'natural_key'):
+            obj_pk = obj._get_pk_val()
+            if obj_pk is not None:
+                object_data['pk'] = smart_unicode(obj_pk)
+        self.xml.startElement("object", object_data)
 
     def end_object(self, obj):
         """
@@ -87,7 +83,7 @@ class Serializer(base.Serializer):
         self._start_relational_field(field)
         related = getattr(obj, field.name)
         if related is not None:
-            if self.use_natural_keys and hasattr(related, 'natural_key'):
+            if self.use_natural_foreign_keys and hasattr(related, 'natural_key'):
                 # If related object has a natural key, use it
                 related = related.natural_key()
                 # Iterable natural keys are rolled out as subelements
@@ -115,7 +111,7 @@ class Serializer(base.Serializer):
         """
         if field.rel.through._meta.auto_created:
             self._start_relational_field(field)
-            if self.use_natural_keys and hasattr(field.rel.to, 'natural_key'):
+            if self.use_natural_foreign_keys and hasattr(field.rel.to, 'natural_key'):
                 # If the objects in the m2m have a natural key, use it
                 def handle_m2m(value):
                     natural = value.natural_key()
@@ -173,13 +169,10 @@ class Deserializer(base.Deserializer):
         Model = self._get_model_from_node(node, "model")
 
         # Start building a data dictionary from the object.
-        # If the node is missing the pk set it to None
-        if node.hasAttribute("pk"):
-            pk = node.getAttribute("pk")
-        else:
-            pk = None
-
-        data = {Model._meta.pk.attname : Model._meta.pk.to_python(pk)}
+        data = {}
+        if node.hasAttribute('pk'):
+            data[Model._meta.pk.attname] = Model._meta.pk.to_python(
+                                                    node.getAttribute('pk'))
 
         # Also start building a dict of m2m data (this is saved as
         # {m2m_accessor_attribute : [list_of_related_objects]})
@@ -210,8 +203,10 @@ class Deserializer(base.Deserializer):
                     value = field.to_python(getInnerText(field_node).strip())
                 data[field.name] = value
 
+        obj = base.build_instance(Model, data, self.db)
+
         # Return a DeserializedObject so that the m2m data has a place to live.
-        return base.DeserializedObject(Model(**data), m2m_data)
+        return base.DeserializedObject(obj, m2m_data)
 
     def _handle_fk_field_node(self, node, field):
         """

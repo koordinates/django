@@ -19,6 +19,10 @@ class Command(BaseCommand):
             help='An appname or appname.ModelName to exclude (use multiple --exclude to exclude multiple apps/models).'),
         make_option('-n', '--natural', action='store_true', dest='use_natural_keys', default=False,
             help='Use natural keys if they are available.'),
+        make_option('--natural-foreign', action='store_true', dest='use_natural_foreign_keys', default=False,
+            help='Use natural foreign keys if they are available.'),
+        make_option('--natural-primary', action='store_true', dest='use_natural_primary_keys', default=False,
+            help='Use natural primary keys if they are available.'),
         make_option('-a', '--all', action='store_true', dest='use_base_manager', default=False,
             help="Use Django's base manager to dump all models stored in the database, including those that would otherwise be filtered or modified by a custom manager."),
     )
@@ -37,6 +41,11 @@ class Command(BaseCommand):
         excludes = options.get('exclude',[])
         show_traceback = options.get('traceback', False)
         use_natural_keys = options.get('use_natural_keys', False)
+        if use_natural_keys:
+            # raise pending deprecation warning.
+            pass
+        use_natural_foreign_keys = options.get('use_natural_foreign_keys') or use_natural_keys
+        use_natural_primary_keys = options.get('use_natural_primary_keys')
         use_base_manager = options.get('use_base_manager', False)
 
         excluded_apps = set()
@@ -111,7 +120,8 @@ class Command(BaseCommand):
 
         try:
             return serializers.serialize(format, objects, indent=indent,
-                        use_natural_keys=use_natural_keys)
+                        use_natural_foreign_keys=use_natural_foreign_keys,
+                        use_natural_primary_keys=use_natural_primary_keys)
         except Exception, e:
             if show_traceback:
                 raise
