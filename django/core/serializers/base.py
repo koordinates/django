@@ -34,11 +34,16 @@ class Serializer(object):
         self.stream = options.pop("stream", StringIO())
         self.selected_fields = options.pop("fields", None)
         self.use_natural_keys = options.pop("use_natural_keys", False)
-        if self.use_natural_keys:
-            # raise pending deprecation warning.
-            pass
         self.use_natural_foreign_keys = options.pop('use_natural_foreign_keys', False)
         self.use_natural_primary_keys = options.pop('use_natural_primary_keys', False)
+        if self.use_natural_keys:
+            # raise pending deprecation warning.
+            import warnings
+            warnings.warn(
+                "use_natural_keys=True is deprecated. Use use_natural_foreign_keys=True instead.",
+                DeprecationWarning
+            )
+            self.use_natural_foreign_keys = True
 
         self.start_serialization()
         for obj in queryset:

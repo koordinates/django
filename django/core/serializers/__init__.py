@@ -88,8 +88,7 @@ def serialize(format, queryset, **options):
     a certain serializer.
     """
     s = get_serializer(format)()
-    s.serialize(queryset, **options)
-    return s.getvalue()
+    return s.serialize(queryset, **options)
 
 def deserialize(format, stream_or_string, **options):
     """
