@@ -30,7 +30,14 @@ class FilterSpecsTests(TestCase):
         self.trueTest = BoolTest.objects.create(completed=True)
         self.falseTest = BoolTest.objects.create(completed=False)
 
-        self.request_factory = RequestFactory()
+        self.staff = User(is_staff=True, is_superuser=False)
+
+        class StaffRequestFactory(RequestFactory):
+            def request(slf, *args, **kwargs):
+                r = super(StaffRequestFactory, slf).request(*args, **kwargs)
+                r.user = self.staff
+                return r
+        self.request_factory = StaffRequestFactory()
 
     def get_changelist(self, request, model, modeladmin):
         return ChangeList(request, model, modeladmin.list_display, modeladmin.list_display_links,
