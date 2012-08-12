@@ -43,7 +43,7 @@ from .models import (BooleanData, CharData, DateData, DateTimeData, EmailData,
     AutoNowDateTimeData, ModifyingSaveData, InheritAbstractModel, BaseModel,
     ExplicitInheritBaseModel, InheritBaseModel, ProxyBaseModel,
     ProxyProxyBaseModel, BigIntegerData, LengthModel, Tag, ComplexModel,
-    NaturalKeyAnchor, FKDataNaturalKey)
+    NaturalKeyAnchor, FKDataNaturalKey, Book)
 
 # A set of functions that can be used to recreate
 # test data objects of various kinds.
@@ -459,34 +459,33 @@ def serializerTest(format, self):
     for klass, count in instance_count.items():
         self.assertEqual(count, klass.objects.count())
 
-def naturalKeySerializerTest(format, self):
-    # Create all the objects defined in the test data
-    objects = []
-    instance_count = {}
-    for (func, pk, klass, datum) in natural_key_test_data:
-        with connection.constraint_checks_disabled():
-            objects.extend(func[0](pk, klass, datum))
+def naturalKeyTest(format, self):
+    book1 = {'isbn13': '978-1590597255', 'title': 'The Definitive Guide to '
+             'Django: Web Development Done Right'}
+    book2 = {'isbn13': '978-1590599969', 'title': 'Practical Django Projects'}
 
-    # Get a count of the number of objects created for each class
-    for klass in instance_count:
-        instance_count[klass] = klass.objects.count()
+    # Create the books.
+    adrian = Book.objects.create(**book1)
+    james = Book.objects.create(**book2)
 
-    # Serialize the test database
-    serialized_data = serializers.serialize(format, objects, indent=2,
-        use_natural_keys=True)
+    # Serialize the books.
+    string_data = serializers.serialize(format, Book.objects.all(), indent=2,
+                                        use_natural_foreign_keys=True,
+                                        use_natural_primary_keys=True)
 
-    for obj in serializers.deserialize(format, serialized_data):
-        obj.save()
+    # Delete one book (to prove that the natural key generation will only
+    # restore the primary keys of books found in the database via the
+    # get_natural_key manager method).
+    james.delete()
 
-    # Assert that the deserialized data is the same
-    # as the original source
-    for (func, pk, klass, datum) in natural_key_test_data:
-        func[1](self, pk, klass, datum)
+    # Deserialize and test.
+    books = list(serializers.deserialize(format, string_data))
+    self.assertEqual(len(books), 2)
+    self.assertEqual(books[0].object.title, book1['title'])
+    self.assertEqual(books[0].object.pk, adrian.pk)
+    self.assertEqual(books[1].object.title, book2['title'])
+    self.assertEqual(books[1].object.pk, None)
 
-    # Assert that the number of objects deserialized is the
-    # same as the number that was serialized.
-    for klass, count in instance_count.items():
-        self.assertEqual(count, klass.objects.count())
 
 def fieldsTest(format, self):
     obj = ComplexModel(field1='first', field2='second', field3='third')
@@ -518,7 +517,7 @@ def streamTest(format, self):
 
 for format in serializers.get_serializer_formats():
     setattr(SerializerTests, 'test_' + format + '_serializer', curry(serializerTest, format))
-    setattr(SerializerTests, 'test_' + format + '_natural_key_serializer', curry(naturalKeySerializerTest, format))
+    setattr(SerializerTests, 'test_' + format + '_serializer_natural_keys', curry(naturalKeyTest, format))
     setattr(SerializerTests, 'test_' + format + '_serializer_fields', curry(fieldsTest, format))
     if format != 'python':
         setattr(SerializerTests, 'test_' + format + '_serializer_stream', curry(streamTest, format))
