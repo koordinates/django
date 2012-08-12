@@ -216,28 +216,6 @@ class CustomTestRunnerOptionsTests(AdminScriptTestCase):
         self.assertOutput(out, 'bar:foo:31337')
 
 
-class Ticket16885RegressionTests(unittest.TestCase):
-    def test_ticket_16885(self):
-        """Features are also confirmed on mirrored databases."""
-        old_db_connections = db.connections
-        try:
-            db.connections = db.ConnectionHandler({
-                'default': {
-                    'ENGINE': 'django.db.backends.sqlite3',
-                },
-                'slave': {
-                    'ENGINE': 'django.db.backends.sqlite3',
-                    'TEST_MIRROR': 'default',
-                },
-            })
-            slave = db.connections['slave']
-            self.assertEqual(slave.features.supports_transactions, None)
-            DjangoTestSuiteRunner(verbosity=0).setup_databases()
-            self.assertNotEqual(slave.features.supports_transactions, None)
-        finally:
-            db.connections = old_db_connections
-
-
 class Ticket17477RegressionTests(AdminScriptTestCase):
     def setUp(self):
         self.write_settings('settings.py')
@@ -263,34 +241,3 @@ class ModulesTestsPackages(unittest.TestCase):
         "Test for #12658 - Tests with ImportError's shouldn't fail silently"
         module = import_module(TEST_APP_ERROR)
         self.assertRaises(ImportError, get_tests, module)
-
-
-class Sqlite3InMemoryTestDbs(unittest.TestCase):
-
-    @unittest.skipUnless(all(db.connections[conn].vendor == 'sqlite' for conn in db.connections),
-                         "This is a sqlite-specific issue")
-    def test_transaction_support(self):
-        """Ticket #16329: sqlite3 in-memory test databases"""
-        old_db_connections = db.connections
-        for option in ('NAME', 'TEST_NAME'):
-            try:
-                db.connections = db.ConnectionHandler({
-                    'default': {
-                        'ENGINE': 'django.db.backends.sqlite3',
-                        option: ':memory:',
-                    },
-                    'other': {
-                        'ENGINE': 'django.db.backends.sqlite3',
-                        option: ':memory:',
-                    },
-                })
-                other = db.connections['other']
-                self.assertIsNone(other.features.supports_transactions)
-                DjangoTestSuiteRunner(verbosity=0).setup_databases()
-                msg = "DATABASES setting '%s' option set to sqlite3's ':memory:' value shouldn't interfere with transaction support detection." % option
-                # Transaction support should be properly initialised for the 'other' DB
-                self.assertIsNotNone(other.features.supports_transactions, msg)
-                # And all the DBs should report that they support transactions
-                self.assertTrue(connections_support_transactions(), msg)
-            finally:
-                db.connections = old_db_connections

@@ -10,6 +10,7 @@ from django.conf import settings
 from django.db import DEFAULT_DB_ALIAS
 from django.db.backends import util
 from django.db.transaction import TransactionManagementError
+from django.utils.functional import cached_property
 from django.utils.importlib import import_module
 from django.utils.timezone import is_aware
 
@@ -399,12 +400,10 @@ class BaseDatabaseFeatures(object):
     # in the SQL standard.
     supports_tablespaces = False
 
-    # Features that need to be confirmed at runtime
-    # Cache whether the confirmation has been performed.
-    _confirmed = False
-    supports_transactions = None
-    supports_stddev = None
-    can_introspect_foreign_keys = None
+    # Confirm support for introspected foreign keys
+    # Every database can do this reliably, except MySQL,
+    # which can't do it for MyISAM tables
+    can_introspect_foreign_keys = True
 
     # Support for the DISTINCT ON clause
     can_distinct_on_fields = False
@@ -412,14 +411,8 @@ class BaseDatabaseFeatures(object):
     def __init__(self, connection):
         self.connection = connection
 
-    def confirm(self):
-        "Perform manual checks of any database features that might vary between installs"
-        self._confirmed = True
-        self.supports_transactions = self._supports_transactions()
-        self.supports_stddev = self._supports_stddev()
-        self.can_introspect_foreign_keys = self._can_introspect_foreign_keys()
-
-    def _supports_transactions(self):
+    @cached_property
+    def supports_transactions(self):
         "Confirm support for transactions"
         cursor = self.connection.cursor()
         cursor.execute('CREATE TABLE ROLLBACK_TEST (X INT)')
@@ -432,7 +425,8 @@ class BaseDatabaseFeatures(object):
         self.connection._commit()
         return count == 0
 
-    def _supports_stddev(self):
+    @cached_property
+    def supports_stddev(self):
         "Confirm support for STDDEV and related stats functions"
         class StdDevPop(object):
             sql_function = 'STDDEV_POP'
@@ -440,12 +434,7 @@ class BaseDatabaseFeatures(object):
         try:
             self.connection.ops.check_aggregate_support(StdDevPop())
         except NotImplementedError:
-            self.supports_stddev = False
-
-    def _can_introspect_foreign_keys(self):
-        "Confirm support for introspected foreign keys"
-        # Every database can do this reliably, except MySQL,
-        # which can't do it for MyISAM tables
+            return False
         return True
 
 
