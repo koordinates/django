@@ -282,7 +282,7 @@ class HttpRequest(object):
 
     def _load_post_and_files(self):
         """Populate self._post and self._files if the content-type is a form type"""
-        if self.method != 'POST':
+        if self.method == 'GET':
             self._post, self._files = QueryDict(encoding=self._encoding), MultiValueDict()
             return
         if self._read_started and not hasattr(self, '_body'):
