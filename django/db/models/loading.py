@@ -2,6 +2,7 @@
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models.signals import app_cache_ready as app_cache_ready_signal
 from django.utils.datastructures import SortedDict
 from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
@@ -77,6 +78,7 @@ class AppCache(object):
                 for app_name in self.postponed:
                     self.load_app(app_name)
                 self.loaded = True
+                app_cache_ready_signal.send(sender=self)
         finally:
             imp.release_lock()
 

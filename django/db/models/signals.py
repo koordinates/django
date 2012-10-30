@@ -1,6 +1,7 @@
 from django.dispatch import Signal
 
 class_prepared = Signal(providing_args=["class"])
+app_cache_ready = Signal()
 
 pre_init = Signal(providing_args=["instance", "args", "kwargs"], use_caching=True)
 post_init = Signal(providing_args=["instance"], use_caching=True)
