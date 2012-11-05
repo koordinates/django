@@ -119,7 +119,7 @@ class Serializer(object):
         if callable(getattr(self.stream, 'getvalue', None)):
             return self.stream.getvalue()
 
-class Deserializer(object):
+class Deserializer(six.Iterator):
     """
     Abstract base deserializer class.
     """
@@ -144,8 +144,6 @@ class Deserializer(object):
     def __next__(self):
         """Iteration iterface -- return the next item in the stream"""
         raise NotImplementedError
-
-    next = __next__             # Python 2 compatibility
 
 class DeserializedObject(object):
     """

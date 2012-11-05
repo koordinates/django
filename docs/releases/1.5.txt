@@ -302,6 +302,10 @@ Django 1.5 also includes several smaller improvements worth noting:
 * The :ref:`cache-based session backend <cached-sessions-backend>` can store
   session data in a non-default cache.
 
+* Multi-column indexes can now be created on models. Read the
+  :attr:`~django.db.models.Options.index_together` documentation for more
+  information.
+
 Backwards incompatible changes in 1.5
 =====================================
 
@@ -638,3 +642,10 @@ The :djadmin:`cleanup` management command has been deprecated and replaced by
 
 The undocumented ``daily_cleanup.py`` script has been deprecated. Use the
 :djadmin:`clearsessions` management command instead.
+
+``depth`` keyword argument in ``select_related``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``depth`` keyword argument in
+:meth:`~django.db.models.query.QuerySet.select_related` has been deprecated.
+You should use field names instead.
