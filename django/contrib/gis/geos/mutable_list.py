@@ -152,7 +152,7 @@ class ListMixin(object):
         for i in range(len(self)):
             try:
                 c = self[i] == other[i]
-            except IndexError:
+            except self._IndexError:
                 # must be other is shorter
                 return False
             if not c:
@@ -164,7 +164,7 @@ class ListMixin(object):
         for i in range(slen):
             try:
                 c = self[i] < other[i]
-            except IndexError:
+            except self._IndexError:
                 # must be other is shorter
                 return False
             if c:
