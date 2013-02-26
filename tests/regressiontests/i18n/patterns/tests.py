@@ -7,16 +7,17 @@ from django.core.urlresolvers import reverse, clear_url_caches
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.template import Template, Context
+from django.utils._os import upath
 from django.utils import translation
 
 
 @override_settings(
     USE_I18N=True,
     LOCALE_PATHS=(
-        os.path.join(os.path.dirname(__file__), 'locale'),
+        os.path.join(os.path.dirname(upath(__file__)), 'locale'),
     ),
     TEMPLATE_DIRS=(
-        os.path.join(os.path.dirname(__file__), 'templates'),
+        os.path.join(os.path.dirname(upath(__file__)), 'templates'),
     ),
     LANGUAGE_CODE='en',
     LANGUAGES=(
@@ -114,6 +115,7 @@ class URLTranslationTests(URLTestCaseBase):
 
         with translation.override('nl'):
             self.assertEqual(reverse('users'), '/nl/gebruikers/')
+            self.assertEqual(reverse('prefixed_xml'), '/nl/prefixed.xml')
 
         with translation.override('pt-br'):
             self.assertEqual(reverse('users'), '/pt-br/usuarios/')
@@ -184,6 +186,9 @@ class URLRedirectWithoutTrailingSlashTests(URLTestCaseBase):
         # target status code of 301 because of CommonMiddleware redirecting
         self.assertIn(('http://testserver/en/account/register/', 301), response.redirect_chain)
         self.assertRedirects(response, '/en/account/register/', 302)
+
+        response = self.client.get('/prefixed.xml', HTTP_ACCEPT_LANGUAGE='en', follow=True)
+        self.assertRedirects(response, '/en/prefixed.xml', 302)
 
 
 class URLRedirectWithoutTrailingSlashSettingTests(URLTestCaseBase):

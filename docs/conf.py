@@ -54,7 +54,7 @@ copyright = 'Django Software Foundation and contributors'
 # The short X.Y version.
 version = '1.5'
 # The full version, including alpha/beta/rc tags.
-release = '1.5b1'
+release = '1.5'
 # The next version to be released
 django_next_version = '1.6'
 
@@ -95,6 +95,7 @@ intersphinx_mapping = {
     'python': ('http://docs.python.org/2.7', None),
     'sphinx': ('http://sphinx.pocoo.org/', None),
     'six': ('http://packages.python.org/six/', None),
+    'simplejson': ('http://simplejson.readthedocs.org/en/latest/', None),
 }
 
 # Python's docs don't change every week.

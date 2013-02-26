@@ -49,8 +49,8 @@ Setting arguments for widgets
 
 Many widgets have optional extra arguments; they can be set when defining the
 widget on the field. In the following example, the
-:attr:`~SelectDateWidget.years` attribute is set for a
-:class:`~django.forms.extras.widgets.SelectDateWidget`::
+:attr:`~django.forms.extras.widgets.SelectDateWidget.years` attribute is set
+for a :class:`~django.forms.extras.widgets.SelectDateWidget`::
 
     from django.forms.fields import DateField, ChoiceField, MultipleChoiceField
     from django.forms.widgets import RadioSelect, CheckboxSelectMultiple
@@ -222,7 +222,7 @@ foundation for custom widgets.
 .. class:: MultiWidget(widgets, attrs=None)
 
     A widget that is composed of multiple widgets.
-    :class:`~django.forms.widgets.MultiWidget` works hand in hand with the
+    :class:`~django.forms.MultiWidget` works hand in hand with the
     :class:`~django.forms.MultiValueField`.
 
     :class:`MultiWidget` has one required argument:
@@ -246,8 +246,8 @@ foundation for custom widgets.
         the combined value of the form field into the values for each widget.
 
         An example of this is how :class:`SplitDateTimeWidget` turns a
-        :class:`datetime` value into a list with date and time split into two
-        separate values::
+        :class:`~datetime.datetime` value into a list with date and time split
+        into two separate values::
 
             class SplitDateTimeWidget(MultiWidget):
 
@@ -279,15 +279,10 @@ foundation for custom widgets.
         * A single value (e.g., a string) that is the "compressed" representation
           of a ``list`` of values.
 
-        If `value` is a list, output of :meth:`~MultiWidget.render` will be a
-        concatenation of rendered child widgets. If `value` is not a list, it
-        will be first processed by the method :meth:`~MultiWidget.decompress()`
-        to create the list and then processed as above.
-
-        In the second case -- i.e., if the value is *not* a list --
-        ``render()`` will first decompress the value into a ``list`` before
-        rendering it. It does so by calling the ``decompress()`` method, which
-        :class:`MultiWidget`'s subclasses must implement (see above).
+        If ``value`` is a list, the output of :meth:`~MultiWidget.render` will
+        be a concatenation of rendered child widgets. If ``value`` is not a
+        list, it will first be processed by the method
+        :meth:`~MultiWidget.decompress()` to create the list and then rendered.
 
         When ``render()`` executes its HTML rendering, each value in the list
         is rendered with the corresponding widget -- the first value is
@@ -508,9 +503,9 @@ Selector and checkbox widgets
 
     .. attribute:: Select.choices
 
-        This attribute is optional when the field does not have a
-        :attr:`~Field.choices` attribute. If it does, it will override anything
-        you set here when the attribute is updated on the :class:`Field`.
+        This attribute is optional when the form field does not have a
+        ``choices`` attribute. If it does, it will override anything you set
+        here when the attribute is updated on the :class:`Field`.
 
 ``NullBooleanSelect``
 ~~~~~~~~~~~~~~~~~~~~~
@@ -662,9 +657,9 @@ Composite widgets
 
     .. attribute:: MultipleHiddenInput.choices
 
-        This attribute is optional when the field does not have a
-        :attr:`~Field.choices` attribute. If it does, it will override anything
-        you set here when the attribute is updated on the :class:`Field`.
+        This attribute is optional when the form field does not have a
+        ``choices`` attribute. If it does, it will override anything you set
+        here when the attribute is updated on the :class:`Field`.
 
 ``SplitDateTimeWidget``
 ~~~~~~~~~~~~~~~~~~~~~~~

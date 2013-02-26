@@ -33,6 +33,7 @@ from django.utils.cache import get_max_age
 from django.utils.encoding import iri_to_uri, force_bytes
 from django.utils.html import escape
 from django.utils.http import urlencode
+from django.utils._os import upath
 from django.utils import six
 from django.test.utils import override_settings
 
@@ -46,11 +47,11 @@ from .models import (Article, BarAccount, CustomArticle, EmptyModel, FooAccount,
     OtherStory, ComplexSortedPerson, Parent, Child, AdminOrderedField,
     AdminOrderedModelMethod, AdminOrderedAdminMethod, AdminOrderedCallable,
     Report, MainPrepopulated, RelatedPrepopulated, UnorderedObject,
-    Simple, UndeletableObject, Choice, Thing)
+    Simple, UndeletableObject, Choice, ShortMessage, Telegram, Thing)
 
 
 ERROR_MESSAGE = "Please enter the correct username and password \
-for a staff account. Note that both fields are case-sensitive."
+for a staff account. Note that both fields may be case-sensitive."
 
 
 @override_settings(PASSWORD_HASHERS=('django.contrib.auth.hashers.SHA1PasswordHasher',))
@@ -607,7 +608,7 @@ class AdminViewFormUrlTest(TestCase):
         Refs #17515.
         """
         template_dirs = settings.TEMPLATE_DIRS + (
-            os.path.join(os.path.dirname(__file__), 'templates'),)
+            os.path.join(os.path.dirname(upath(__file__)), 'templates'),)
         with self.settings(TEMPLATE_DIRS=template_dirs):
             response = self.client.get("/test_admin/admin/admin_views/color2/")
             self.assertTrue('custom_filter_template.html' in [t.name for t in response.templates])
@@ -744,7 +745,10 @@ class CustomModelAdminTest(AdminViewBasicTest):
         self.assertContains(response, 'Hello from a custom logout template')
 
     def testCustomAdminSiteIndexViewAndTemplate(self):
-        response = self.client.get('/test_admin/admin2/')
+        try:
+            response = self.client.get('/test_admin/admin2/')
+        except TypeError:
+            self.fail('AdminSite.index_template should accept a list of template paths')
         self.assertIsInstance(response, TemplateResponse)
         self.assertTemplateUsed(response, 'custom_admin/index.html')
         self.assertContains(response, 'Hello from a custom index template *bar*')
@@ -765,6 +769,15 @@ class CustomModelAdminTest(AdminViewBasicTest):
         self.client.login(username='super', password='secret')
         response = self.client.get('/test_admin/%s/my_view/' % self.urlbit)
         self.assertEqual(response.content, b"Django is a magical pony!")
+
+    def test_pwd_change_custom_template(self):
+        self.client.login(username='super', password='secret')
+        su = User.objects.get(username='super')
+        try:
+            response = self.client.get('/test_admin/admin4/auth/user/%s/password/' % su.pk)
+        except TypeError:
+            self.fail('ModelAdmin.change_user_password_template should accept a list of template paths')
+        self.assertEqual(response.status_code, 200)
 
 
 def get_perm(Model, perm):
@@ -1070,6 +1083,46 @@ class AdminViewPermissionsTest(TestCase):
             self.assertEqual(RowLevelChangePermissionModel.objects.get(id=2).name, 'changed')
             self.assertEqual(response.status_code, 200)
             self.assertContains(response, 'login-form')
+            self.client.get('/test_admin/admin/logout/')
+
+    def testHistoryView(self):
+        """History view should restrict access."""
+
+        # add user shoud not be able to view the list of article or change any of them
+        self.client.get('/test_admin/admin/')
+        self.client.post('/test_admin/admin/', self.adduser_login)
+        response = self.client.get('/test_admin/admin/admin_views/article/1/history/')
+        self.assertEqual(response.status_code, 403)
+        self.client.get('/test_admin/admin/logout/')
+
+        # change user can view all items and edit them
+        self.client.get('/test_admin/admin/')
+        self.client.post('/test_admin/admin/', self.changeuser_login)
+        response = self.client.get('/test_admin/admin/admin_views/article/1/history/')
+        self.assertEqual(response.status_code, 200)
+
+        # Test redirection when using row-level change permissions. Refs #11513.
+        RowLevelChangePermissionModel.objects.create(id=1, name="odd id")
+        RowLevelChangePermissionModel.objects.create(id=2, name="even id")
+        for login_dict in [self.super_login, self.changeuser_login, self.adduser_login, self.deleteuser_login]:
+            self.client.post('/test_admin/admin/', login_dict)
+            response = self.client.get('/test_admin/admin/admin_views/rowlevelchangepermissionmodel/1/history/')
+            self.assertEqual(response.status_code, 403)
+
+            response = self.client.get('/test_admin/admin/admin_views/rowlevelchangepermissionmodel/2/history/')
+            self.assertEqual(response.status_code, 200)
+
+            self.client.get('/test_admin/admin/logout/')
+
+        for login_dict in [self.joepublic_login, self.no_username_login]:
+            self.client.post('/test_admin/admin/', login_dict)
+            response = self.client.get('/test_admin/admin/admin_views/rowlevelchangepermissionmodel/1/history/')
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'login-form')
+            response = self.client.get('/test_admin/admin/admin_views/rowlevelchangepermissionmodel/2/history/')
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'login-form')
+
             self.client.get('/test_admin/admin/logout/')
 
     def testConditionallyShowAddSectionLink(self):
@@ -2461,7 +2514,7 @@ class TestCustomChangeList(TestCase):
         self.assertEqual(response.status_code, 302)  # redirect somewhere
         # Hit the page once to get messages out of the queue message list
         response = self.client.get('/test_admin/%s/admin_views/gadget/' % self.urlbit)
-        # Ensure that that data is still not visible on the page
+        # Ensure that data is still not visible on the page
         response = self.client.get('/test_admin/%s/admin_views/gadget/' % self.urlbit)
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'First Gadget')
@@ -2512,27 +2565,93 @@ class AdminCustomQuerysetTest(TestCase):
             else:
                 self.assertEqual(response.status_code, 404)
 
-    def test_add_model_modeladmin_only_qs(self):
-        # only() is used in ModelAdmin.queryset()
-        p = Paper.objects.create(title="My Paper Title")
-        self.assertEqual(Paper.objects.count(), 1)
-        response = self.client.get('/test_admin/admin/admin_views/paper/%s/' % p.pk)
+    def test_add_model_modeladmin_defer_qs(self):
+        # Test for #14529. defer() is used in ModelAdmin.queryset()
+
+        # model has __unicode__ method
+        self.assertEqual(CoverLetter.objects.count(), 0)
+        # Emulate model instance creation via the admin
+        post_data = {
+            "author": "Candidate, Best",
+            "_save": "Save",
+        }
+        response = self.client.post('/test_admin/admin/admin_views/coverletter/add/',
+                                    post_data, follow=True)
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(CoverLetter.objects.count(), 1)
+        # Message should contain non-ugly model verbose name
+        self.assertContains(
+            response,
+            '<li class="info">The cover letter &quot;Candidate, Best&quot; was added successfully.</li>',
+            html=True
+        )
+
+        # model has no __unicode__ method
+        self.assertEqual(ShortMessage.objects.count(), 0)
+        # Emulate model instance creation via the admin
+        post_data = {
+            "content": "What's this SMS thing?",
+            "_save": "Save",
+        }
+        response = self.client.post('/test_admin/admin/admin_views/shortmessage/add/',
+                post_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ShortMessage.objects.count(), 1)
+        # Message should contain non-ugly model verbose name
+        self.assertContains(
+            response,
+            '<li class="info">The short message &quot;ShortMessage object&quot; was added successfully.</li>',
+            html=True
+        )
+
+    def test_add_model_modeladmin_only_qs(self):
+        # Test for #14529. only() is used in ModelAdmin.queryset()
+
+        # model has __unicode__ method
+        self.assertEqual(Telegram.objects.count(), 0)
+        # Emulate model instance creation via the admin
+        post_data = {
+            "title": "Urgent telegram",
+            "_save": "Save",
+        }
+        response = self.client.post('/test_admin/admin/admin_views/telegram/add/',
+                post_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Telegram.objects.count(), 1)
+        # Message should contain non-ugly model verbose name
+        self.assertContains(
+            response,
+            '<li class="info">The telegram &quot;Urgent telegram&quot; was added successfully.</li>',
+            html=True
+        )
+
+        # model has no __unicode__ method
+        self.assertEqual(Paper.objects.count(), 0)
+        # Emulate model instance creation via the admin
         post_data = {
             "title": "My Modified Paper Title",
             "_save": "Save",
         }
-        response = self.client.post('/test_admin/admin/admin_views/paper/%s/' % p.pk,
+        response = self.client.post('/test_admin/admin/admin_views/paper/add/',
                 post_data, follow=True)
         self.assertEqual(response.status_code, 200)
-        # Message should contain non-ugly model name. Instance representation is set by six.text_type() (ugly)
-        self.assertContains(response, '<li class="info">The paper &quot;Paper_Deferred_author object&quot; was changed successfully.</li>', html=True)
+        self.assertEqual(Paper.objects.count(), 1)
+        # Message should contain non-ugly model verbose name
+        self.assertContains(
+            response,
+            '<li class="info">The paper &quot;Paper object&quot; was added successfully.</li>',
+            html=True
+        )
 
-        # defer() is used in ModelAdmin.queryset()
+    def test_edit_model_modeladmin_defer_qs(self):
+        # Test for #14529. defer() is used in ModelAdmin.queryset()
+
+        # model has __unicode__ method
         cl = CoverLetter.objects.create(author="John Doe")
         self.assertEqual(CoverLetter.objects.count(), 1)
         response = self.client.get('/test_admin/admin/admin_views/coverletter/%s/' % cl.pk)
         self.assertEqual(response.status_code, 200)
+        # Emulate model instance edit via the admin
         post_data = {
             "author": "John Doe II",
             "_save": "Save",
@@ -2540,8 +2659,83 @@ class AdminCustomQuerysetTest(TestCase):
         response = self.client.post('/test_admin/admin/admin_views/coverletter/%s/' % cl.pk,
                 post_data, follow=True)
         self.assertEqual(response.status_code, 200)
-        # Message should contain non-ugly model name. Instance representation is set by model's __unicode__()
-        self.assertContains(response, '<li class="info">The cover letter &quot;John Doe II&quot; was changed successfully.</li>', html=True)
+        self.assertEqual(CoverLetter.objects.count(), 1)
+        # Message should contain non-ugly model verbose name. Instance
+        # representation is set by model's __unicode__()
+        self.assertContains(
+            response,
+            '<li class="info">The cover letter &quot;John Doe II&quot; was changed successfully.</li>',
+            html=True
+        )
+
+        # model has no __unicode__ method
+        sm = ShortMessage.objects.create(content="This is expensive")
+        self.assertEqual(ShortMessage.objects.count(), 1)
+        response = self.client.get('/test_admin/admin/admin_views/shortmessage/%s/' % sm.pk)
+        self.assertEqual(response.status_code, 200)
+        # Emulate model instance edit via the admin
+        post_data = {
+            "content": "Too expensive",
+            "_save": "Save",
+        }
+        response = self.client.post('/test_admin/admin/admin_views/shortmessage/%s/' % sm.pk,
+                post_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ShortMessage.objects.count(), 1)
+        # Message should contain non-ugly model verbose name. The ugly(!)
+        # instance representation is set by six.text_type()
+        self.assertContains(
+            response,
+            '<li class="info">The short message &quot;ShortMessage_Deferred_timestamp object&quot; was changed successfully.</li>',
+            html=True
+        )
+
+    def test_edit_model_modeladmin_only_qs(self):
+        # Test for #14529. only() is used in ModelAdmin.queryset()
+
+        # model has __unicode__ method
+        t = Telegram.objects.create(title="Frist Telegram")
+        self.assertEqual(Telegram.objects.count(), 1)
+        response = self.client.get('/test_admin/admin/admin_views/telegram/%s/' % t.pk)
+        self.assertEqual(response.status_code, 200)
+        # Emulate model instance edit via the admin
+        post_data = {
+            "title": "Telegram without typo",
+            "_save": "Save",
+        }
+        response = self.client.post('/test_admin/admin/admin_views/telegram/%s/' % t.pk,
+                post_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Telegram.objects.count(), 1)
+        # Message should contain non-ugly model verbose name. The instance
+        # representation is set by model's __unicode__()
+        self.assertContains(
+            response,
+            '<li class="info">The telegram &quot;Telegram without typo&quot; was changed successfully.</li>',
+            html=True
+        )
+
+        # model has no __unicode__ method
+        p = Paper.objects.create(title="My Paper Title")
+        self.assertEqual(Paper.objects.count(), 1)
+        response = self.client.get('/test_admin/admin/admin_views/paper/%s/' % p.pk)
+        self.assertEqual(response.status_code, 200)
+        # Emulate model instance edit via the admin
+        post_data = {
+            "title": "My Modified Paper Title",
+            "_save": "Save",
+        }
+        response = self.client.post('/test_admin/admin/admin_views/paper/%s/' % p.pk,
+                post_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Paper.objects.count(), 1)
+        # Message should contain non-ugly model verbose name. The ugly(!)
+        # instance representation is set by six.text_type()
+        self.assertContains(
+            response,
+            '<li class="info">The paper &quot;Paper_Deferred_author object&quot; was changed successfully.</li>',
+            html=True
+        )
 
 
 @override_settings(PASSWORD_HASHERS=('django.contrib.auth.hashers.SHA1PasswordHasher',))
@@ -3088,16 +3282,7 @@ class SeleniumPrePopulatedFirefoxTests(AdminSeleniumWebDriverTestCase):
 
         # Save and check that everything is properly stored in the database
         self.selenium.find_element_by_xpath('//input[@value="Save"]').click()
-
-        try:
-            # Wait for the next page to be loaded.
-            self.wait_loaded_tag('body')
-        except TimeoutException:
-            # IE7 occasionnally returns an error "Internet Explorer cannot
-            # display the webpage" and doesn't load the next page. We just
-            # ignore it.
-            pass
-
+        self.wait_page_loaded()
         self.assertEqual(MainPrepopulated.objects.all().count(), 1)
         MainPrepopulated.objects.get(
             name=' this is the mAin nÀMë and it\'s awεšome',
@@ -3172,6 +3357,7 @@ class ReadonlyTest(TestCase):
 
         # Checks that multiline text in a readonly field gets <br /> tags
         self.assertContains(response, "Multiline<br />test<br />string")
+        self.assertContains(response, "InlineMultiline<br />test<br />string")
 
         self.assertContains(response,
             formats.localize(datetime.date.today() - datetime.timedelta(days=7))
@@ -3530,14 +3716,14 @@ class DateHierarchyTests(TestCase):
 
     def assert_contains_month_link(self, response, date):
         self.assertContains(
-            response, '?release_date__year=%d&amp;release_date__month=%d"' % (
-                date.year, date.month))
+            response, '?release_date__month=%d&amp;release_date__year=%d"' % (
+                date.month, date.year))
 
     def assert_contains_day_link(self, response, date):
         self.assertContains(
-            response, '?release_date__year=%d&amp;'
-            'release_date__month=%d&amp;release_date__day=%d"' % (
-                date.year, date.month, date.day))
+            response, '?release_date__day=%d&amp;'
+            'release_date__month=%d&amp;release_date__year=%d"' % (
+                date.day, date.month, date.year))
 
     def test_empty(self):
         """

@@ -3,6 +3,8 @@
 Formsets
 ========
 
+.. class:: django.forms.formset.BaseFormSet
+
 A formset is a layer of abstraction to working with multiple forms on the same
 page. It can be best compared to a data grid. Let's say you have the following
 form::
@@ -37,7 +39,7 @@ display two blank forms::
 
 Iterating over the ``formset`` will render the forms in the order they were
 created. You can change this order by providing an alternate implementation for
-the :meth:`__iter__()` method.
+the ``__iter__()`` method.
 
 Formsets can also be indexed into, which returns the corresponding form. If you
 override ``__iter__``, you will need to also override ``__getitem__`` to have
@@ -96,8 +98,8 @@ If the value of ``max_num`` is greater than the number of existing
 objects, up to ``extra`` additional blank forms will be added to the formset,
 so long as the total number of forms does not exceed ``max_num``.
 
-A ``max_num`` value of ``None`` (the default) puts no limit on the number of
-forms displayed.
+A ``max_num`` value of ``None`` (the default) puts a high limit on the number
+of forms displayed (1000). In practice this is equivalent to no limit.
 
 Formset validation
 ------------------

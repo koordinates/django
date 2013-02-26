@@ -70,6 +70,7 @@ real_rollback = transaction.rollback
 real_enter_transaction_management = transaction.enter_transaction_management
 real_leave_transaction_management = transaction.leave_transaction_management
 real_managed = transaction.managed
+real_abort = transaction.abort
 
 def nop(*args, **kwargs):
     return
@@ -80,6 +81,7 @@ def disable_transaction_methods():
     transaction.enter_transaction_management = nop
     transaction.leave_transaction_management = nop
     transaction.managed = nop
+    transaction.abort = nop
 
 def restore_transaction_methods():
     transaction.commit = real_commit
@@ -87,6 +89,7 @@ def restore_transaction_methods():
     transaction.enter_transaction_management = real_enter_transaction_management
     transaction.leave_transaction_management = real_leave_transaction_management
     transaction.managed = real_managed
+    transaction.abort = real_abort
 
 
 def assert_and_parse_html(self, html, user_msg, msg):
@@ -393,6 +396,32 @@ class SimpleTestCase(ut2.TestCase):
                 safe_repr(dom1, True), safe_repr(dom2, True))
             self.fail(self._formatMessage(msg, standardMsg))
 
+    def assertInHTML(self, needle, haystack, count = None, msg_prefix=''):
+        needle = assert_and_parse_html(self, needle, None,
+            'First argument is not valid HTML:')
+        haystack = assert_and_parse_html(self, haystack, None,
+            'Second argument is not valid HTML:')
+        real_count = haystack.count(needle)
+        if count is not None:
+            self.assertEqual(real_count, count,
+                msg_prefix + "Found %d instances of '%s' in response"
+                " (expected %d)" % (real_count, needle, count))
+        else:
+            self.assertTrue(real_count != 0,
+                msg_prefix + "Couldn't find '%s' in response" % needle)
+
+    def assertJSONEqual(self, raw, expected_data, msg=None):
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            self.fail("First argument is not valid JSON: %r" % raw)
+        if isinstance(expected_data, six.string_types):
+            try:
+                expected_data = json.loads(expected_data)
+            except ValueError:
+                self.fail("Second argument is not valid JSON: %r" % expected_data)
+        self.assertEqual(data, expected_data, msg=msg)
+
     def assertXMLEqual(self, xml1, xml2, msg=None):
         """
         Asserts that two XML snippets are semantically the same.
@@ -615,8 +644,6 @@ class TransactionTestCase(SimpleTestCase):
         else:
             content = response.content
         content = content.decode(response._charset)
-        # Avoid ResourceWarning about unclosed files.
-        response.close()
         if html:
             content = assert_and_parse_html(self, content, None,
                 "Response's content is not valid HTML:")

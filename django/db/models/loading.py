@@ -6,6 +6,7 @@ from django.db.models.signals import app_cache_ready as app_cache_ready_signal
 from django.utils.datastructures import SortedDict
 from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
+from django.utils._os import upath
 from django.utils import six
 
 import imp
@@ -246,8 +247,8 @@ class AppCache(object):
                 # The same model may be imported via different paths (e.g.
                 # appname.models and project.appname.models). We use the source
                 # filename as a means to detect identity.
-                fname1 = os.path.abspath(sys.modules[model.__module__].__file__)
-                fname2 = os.path.abspath(sys.modules[model_dict[model_name].__module__].__file__)
+                fname1 = os.path.abspath(upath(sys.modules[model.__module__].__file__))
+                fname2 = os.path.abspath(upath(sys.modules[model_dict[model_name].__module__].__file__))
                 # Since the filename extension could be .py the first time and
                 # .pyc or .pyo the second time, ignore the extension when
                 # comparing.

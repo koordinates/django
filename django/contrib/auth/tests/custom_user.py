@@ -1,5 +1,11 @@
 from django.db import models
-from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, AbstractUser, UserManager
+from django.contrib.auth.models import (
+    BaseUserManager,
+    AbstractBaseUser,
+    AbstractUser,
+    UserManager,
+    PermissionsMixin
+)
 
 
 # The custom User uses email as the unique identifier, and requires
@@ -36,7 +42,7 @@ class CustomUser(AbstractBaseUser):
     is_admin = models.BooleanField(default=False)
     date_of_birth = models.DateField()
 
-    objects = CustomUserManager()
+    custom_objects = CustomUserManager()
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['date_of_birth']
@@ -82,12 +88,46 @@ class CustomUser(AbstractBaseUser):
 class ExtensionUser(AbstractUser):
     date_of_birth = models.DateField()
 
-    objects = UserManager()
+    custom_objects = UserManager()
 
     REQUIRED_FIELDS = AbstractUser.REQUIRED_FIELDS + ['date_of_birth']
 
     class Meta:
         app_label = 'auth'
+
+
+# The CustomPermissionsUser users email as the identifier, but uses the normal
+# Django permissions model. This allows us to check that the PermissionsMixin
+# includes everything that is needed to interact with the ModelBackend.
+
+class CustomPermissionsUserManager(CustomUserManager):
+    def create_superuser(self, email, password, date_of_birth):
+        u = self.create_user(email, password=password, date_of_birth=date_of_birth)
+        u.is_superuser = True
+        u.save(using=self._db)
+        return u
+
+
+class CustomPermissionsUser(AbstractBaseUser, PermissionsMixin):
+    email = models.EmailField(verbose_name='email address', max_length=255, unique=True)
+    date_of_birth = models.DateField()
+
+    custom_objects = CustomPermissionsUserManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['date_of_birth']
+
+    class Meta:
+        app_label = 'auth'
+
+    def get_full_name(self):
+        return self.email
+
+    def get_short_name(self):
+        return self.email
+
+    def __unicode__(self):
+        return self.email
 
 
 class IsActiveTestUser1(AbstractBaseUser):
@@ -96,7 +136,7 @@ class IsActiveTestUser1(AbstractBaseUser):
     """
     username = models.CharField(max_length=30, unique=True)
 
-    objects = BaseUserManager()
+    custom_objects = BaseUserManager()
 
     USERNAME_FIELD = 'username'
 
@@ -105,3 +145,24 @@ class IsActiveTestUser1(AbstractBaseUser):
 
     # the is_active attr is provided by AbstractBaseUser
 
+
+class CustomUserNonUniqueUsername(AbstractBaseUser):
+    "A user with a non-unique username"
+    username = models.CharField(max_length=30)
+
+    USERNAME_FIELD = 'username'
+
+    class Meta:
+        app_label = 'auth'
+
+
+class CustomUserBadRequiredFields(AbstractBaseUser):
+    "A user with a non-unique username"
+    username = models.CharField(max_length=30, unique=True)
+    date_of_birth = models.DateField()
+
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['username', 'date_of_birth']
+
+    class Meta:
+        app_label = 'auth'

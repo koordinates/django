@@ -16,16 +16,20 @@ import codecs
 
 from django import conf, bin, get_version
 from django.conf import settings
+from django.core.management import BaseCommand
 from django.db import connection
 from django.test.simple import DjangoTestSuiteRunner
 from django.utils import unittest
+from django.utils.encoding import force_str, force_text
+from django.utils._os import upath
+from django.utils.six import StringIO
 from django.test import LiveServerTestCase
 
-test_dir = os.path.dirname(os.path.dirname(__file__))
+test_dir = os.path.dirname(os.path.dirname(upath(__file__)))
 
 class AdminScriptTestCase(unittest.TestCase):
     def write_settings(self, filename, apps=None, is_dir=False, sdict=None):
-        test_dir = os.path.dirname(os.path.dirname(__file__))
+        test_dir = os.path.dirname(os.path.dirname(upath(__file__)))
         if is_dir:
             settings_dir = os.path.join(test_dir, filename)
             os.mkdir(settings_dir)
@@ -94,6 +98,7 @@ class AdminScriptTestCase(unittest.TestCase):
         return paths
 
     def run_test(self, script, args, settings_file=None, apps=None):
+        test_dir = os.path.dirname(os.path.dirname(__file__))
         project_dir = os.path.dirname(test_dir)
         base_dir = os.path.dirname(project_dir)
         ext_backend_base_dirs = self._ext_backend_paths()
@@ -134,7 +139,7 @@ class AdminScriptTestCase(unittest.TestCase):
         return out, err
 
     def run_django_admin(self, args, settings_file=None):
-        bin_dir = os.path.abspath(os.path.dirname(bin.__file__))
+        bin_dir = os.path.abspath(os.path.dirname(upath(bin.__file__)))
         return self.run_test(os.path.join(bin_dir, 'django-admin.py'), args, settings_file)
 
     def run_manage(self, args, settings_file=None):
@@ -144,7 +149,7 @@ class AdminScriptTestCase(unittest.TestCase):
             except OSError:
                 pass
 
-        conf_dir = os.path.dirname(conf.__file__)
+        conf_dir = os.path.dirname(upath(conf.__file__))
         template_manage_py = os.path.join(conf_dir, 'project_template', 'manage.py')
 
         test_manage_py = os.path.join(test_dir, 'manage.py')
@@ -166,10 +171,12 @@ class AdminScriptTestCase(unittest.TestCase):
 
     def assertOutput(self, stream, msg):
         "Utility assertion: assert that the given message exists in the output"
+        stream = force_text(stream)
         self.assertTrue(msg in stream, "'%s' does not match actual output text '%s'" % (msg, stream))
 
     def assertNotInOutput(self, stream, msg):
         "Utility assertion: assert that the given message doesn't exist in the output"
+        stream = force_text(stream)
         self.assertFalse(msg in stream, "'%s' matches actual output text '%s'" % (msg, stream))
 
 ##########################################################################
@@ -1274,6 +1281,31 @@ class CommandTypes(AdminScriptTestCase):
         self.assertNoOutput(err)
         self.assertOutput(out, "EXECUTE:BaseCommand labels=('testlabel',), options=[('option_a', 'x'), ('option_b', 'y'), ('option_c', '3'), ('pythonpath', None), ('settings', None), ('traceback', None), ('verbosity', '1')]")
 
+    def test_base_run_from_argv(self):
+        """
+        Test run_from_argv properly terminates even with custom execute() (#19665)
+        Also test proper traceback display.
+        """
+        command = BaseCommand()
+        command.execute = lambda args: args  # This will trigger TypeError
+
+        old_stderr = sys.stderr
+        sys.stderr = err = StringIO()
+        try:
+            with self.assertRaises(SystemExit):
+                command.run_from_argv(['', ''])
+            err_message = err.getvalue()
+            self.assertNotIn("Traceback", err_message)
+            self.assertIn("TypeError", err_message)
+
+            with self.assertRaises(SystemExit):
+                command.run_from_argv(['', '', '--traceback'])
+            err_message = err.getvalue()
+            self.assertIn("Traceback (most recent call last)", err_message)
+            self.assertIn("TypeError", err_message)
+        finally:
+            sys.stderr = old_stderr
+
     def test_noargs(self):
         "NoArg Commands can be executed"
         args = ['noargs_command']
@@ -1553,7 +1585,7 @@ class StartProject(LiveServerTestCase, AdminScriptTestCase):
         self.assertNoOutput(err)
         test_manage_py = os.path.join(testproject_dir, 'manage.py')
         with open(test_manage_py, 'r') as fp:
-            content = fp.read()
+            content = force_text(fp.read())
             self.assertIn("project_name = 'another_project'", content)
             self.assertIn("project_directory = '%s'" % testproject_dir, content)
 

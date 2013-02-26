@@ -68,6 +68,42 @@ of (Full name, email address). Example::
 Note that Django will email *all* of these people whenever an error happens.
 See :doc:`/howto/error-reporting` for more information.
 
+.. setting:: ALLOWED_HOSTS
+
+ALLOWED_HOSTS
+-------------
+
+Default: ``[]`` (Empty list)
+
+A list of strings representing the host/domain names that this Django site can
+serve. This is a security measure to prevent an attacker from poisoning caches
+and password reset emails with links to malicious hosts by submitting requests
+with a fake HTTP ``Host`` header, which is possible even under many
+seemingly-safe webserver configurations.
+
+Values in this list can be fully qualified names (e.g. ``'www.example.com'``),
+in which case they will be matched against the request's ``Host`` header
+exactly (case-insensitive, not including port). A value beginning with a period
+can be used as a subdomain wildcard: ``'.example.com'`` will match
+``example.com``, ``www.example.com``, and any other subdomain of
+``example.com``. A value of ``'*'`` will match anything; in this case you are
+responsible to provide your own validation of the ``Host`` header (perhaps in a
+middleware; if so this middleware must be listed first in
+:setting:`MIDDLEWARE_CLASSES`).
+
+If the ``Host`` header (or ``X-Forwarded-Host`` if
+:setting:`USE_X_FORWARDED_HOST` is enabled) does not match any value in this
+list, the :meth:`django.http.HttpRequest.get_host()` method will raise
+:exc:`~django.core.exceptions.SuspiciousOperation`.
+
+When :setting:`DEBUG` is ``True`` or when running tests, host validation is
+disabled; any host will be accepted. Thus it's usually only necessary to set it
+in production.
+
+This validation only applies via :meth:`~django.http.HttpRequest.get_host()`;
+if your code accesses the ``Host`` header directly from ``request.META`` you
+are bypassing this security protection.
+
 .. setting:: ALLOWED_INCLUDE_ROOTS
 
 ALLOWED_INCLUDE_ROOTS
@@ -107,8 +143,8 @@ AUTHENTICATION_BACKENDS
 Default: ``('django.contrib.auth.backends.ModelBackend',)``
 
 A tuple of authentication backend classes (as strings) to use when attempting to
-authenticate a user. See the :doc:`authentication backends documentation
-</ref/authbackends>` for details.
+authenticate a user. See the :ref:`authentication backends documentation
+<authentication-backends>` for details.
 
 .. setting:: AUTH_USER_MODEL
 
@@ -159,7 +195,7 @@ The cache backend to use. The built-in cache backends are:
 * ``'django.core.cache.backends.memcached.PyLibMCCache'``
 
 You can use a cache backend that doesn't ship with Django by setting
-:setting:`BACKEND <CACHE-BACKEND>` to a fully-qualified path of a cache
+:setting:`BACKEND <CACHES-BACKEND>` to a fully-qualified path of a cache
 backend class (i.e. ``mypackage.backends.whatever.WhateverCache``).
 Writing a whole new cache backend from scratch is left as an exercise
 to the reader; see the other backends for examples.
@@ -431,10 +467,12 @@ MySQL will connect via a Unix socket to the specified socket. For example::
 If you're using MySQL and this value *doesn't* start with a forward slash, then
 this value is assumed to be the host.
 
-If you're using PostgreSQL, an empty string means to use a Unix domain socket
-for the connection, rather than a network connection to localhost. If you
-explicitly need to use a TCP/IP connection on the local machine with
-PostgreSQL, specify ``localhost`` here.
+If you're using PostgreSQL, by default (empty :setting:`HOST`), the connection
+to the database is done through UNIX domain sockets ('local' lines in
+``pg_hba.conf``). If you want to connect through TCP sockets, set
+:setting:`HOST` to 'localhost' or '127.0.0.1' ('host' lines in ``pg_hba.conf``).
+On Windows, you should always define :setting:`HOST`, as UNIX domain sockets
+are not available.
 
 .. setting:: NAME
 
@@ -560,7 +598,7 @@ If the default value (``None``) is used with the SQLite database engine, the
 tests will use a memory resident database. For all other database engines the
 test database will use the name ``'test_' + DATABASE_NAME``.
 
-See :doc:`/topics/testing`.
+See :ref:`the-test-database`.
 
 .. setting:: TEST_CREATE
 
@@ -668,9 +706,13 @@ DATE_INPUT_FORMATS
 
 Default::
 
-    ('%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y', '%b %d %Y',
-    '%b %d, %Y', '%d %b %Y', '%d %b, %Y', '%B %d %Y',
-    '%B %d, %Y', '%d %B %Y', '%d %B, %Y')
+    (
+        '%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y', # '2006-10-25', '10/25/2006', '10/25/06'
+        '%b %d %Y', '%b %d, %Y',            # 'Oct 25 2006', 'Oct 25, 2006'
+        '%d %b %Y', '%d %b, %Y',            # '25 Oct 2006', '25 Oct, 2006'
+        '%B %d %Y', '%B %d, %Y',            # 'October 25 2006', 'October 25, 2006'
+        '%d %B %Y', '%d %B, %Y',            # '25 October 2006', '25 October, 2006'
+    )
 
 A tuple of formats that will be accepted when inputting data on a date field.
 Formats will be tried in order, using the first valid one. Note that these
@@ -705,9 +747,20 @@ DATETIME_INPUT_FORMATS
 
 Default::
 
-    ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d',
-    '%m/%d/%Y %H:%M:%S', '%m/%d/%Y %H:%M', '%m/%d/%Y',
-    '%m/%d/%y %H:%M:%S', '%m/%d/%y %H:%M', '%m/%d/%y')
+    (
+        '%Y-%m-%d %H:%M:%S',     # '2006-10-25 14:30:59'
+        '%Y-%m-%d %H:%M:%S.%f',  # '2006-10-25 14:30:59.000200'
+        '%Y-%m-%d %H:%M',        # '2006-10-25 14:30'
+        '%Y-%m-%d',              # '2006-10-25'
+        '%m/%d/%Y %H:%M:%S',     # '10/25/2006 14:30:59'
+        '%m/%d/%Y %H:%M:%S.%f',  # '10/25/2006 14:30:59.000200'
+        '%m/%d/%Y %H:%M',        # '10/25/2006 14:30'
+        '%m/%d/%Y',              # '10/25/2006'
+        '%m/%d/%y %H:%M:%S',     # '10/25/06 14:30:59'
+        '%m/%d/%y %H:%M:%S.%f',  # '10/25/06 14:30:59.000200'
+        '%m/%d/%y %H:%M',        # '10/25/06 14:30'
+        '%m/%d/%y',              # '10/25/06'
+    )
 
 A tuple of formats that will be accepted when inputting data on a datetime
 field. Formats will be tried in order, using the first valid one. Note that
@@ -746,13 +799,13 @@ sensitive (or offensive), such as :setting:`SECRET_KEY` or
 :setting:`PROFANITIES_LIST`. Specifically, it will exclude any setting whose
 name includes any of the following:
 
-    * API
-    * KEY
-    * PASS
-    * PROFANITIES_LIST
-    * SECRET
-    * SIGNATURE
-    * TOKEN
+* ``'API'``
+* ``'KEY'``
+* ``'PASS'``
+* ``'PROFANITIES_LIST'``
+* ``'SECRET'``
+* ``'SIGNATURE'``
+* ``'TOKEN'``
 
 .. versionchanged:: 1.4
 
@@ -828,7 +881,7 @@ DEFAULT_EXCEPTION_REPORTER_FILTER
 Default: :class:`django.views.debug.SafeExceptionReporterFilter`
 
 Default exception reporter filter class to be used if none has been assigned to
-the :class:`HttpRequest` instance yet.
+the :class:`~django.http.HttpRequest` instance yet.
 See :ref:`Filtering error reports<filtering-error-reports>`.
 
 .. setting:: DEFAULT_FILE_STORAGE
@@ -1068,6 +1121,8 @@ Note that these paths should use Unix-style forward slashes, even on Windows.
 
 See :ref:`initial-data-via-fixtures` and :ref:`topics-testing-fixtures`.
 
+.. setting:: FORCE_SCRIPT_NAME
+
 FORCE_SCRIPT_NAME
 ------------------
 
@@ -1119,9 +1174,11 @@ Default: ``()``
 
 List of compiled regular expression objects describing URLs that should be
 ignored when reporting HTTP 404 errors via email (see
-:doc:`/howto/error-reporting`). Use this if your site does not provide a
-commonly requested file such as ``favicon.ico`` or ``robots.txt``, or if it
-gets hammered by script kiddies.
+:doc:`/howto/error-reporting`). Regular expressions are matched against
+:meth:`request's full paths <django.http.HttpRequest.get_full_path>` (including
+query string, if any). Use this if your site does not provide a commonly
+requested file such as ``favicon.ico`` or ``robots.txt``, or if it gets
+hammered by script kiddies.
 
 This is only used if :setting:`SEND_BROKEN_LINK_EMAILS` is set to ``True`` and
 ``CommonMiddleware`` is installed (see :doc:`/topics/http/middleware`).
@@ -1242,9 +1299,8 @@ Example::
         '/var/local/translations/locale'
     )
 
-Note that in the paths you add to the value of this setting, if you have the
-typical ``/path/to/locale/xx/LC_MESSAGES`` hierarchy, you should use the path to
-the ``locale`` directory (i.e. ``'/path/to/locale'``).
+Django will look within each of these paths for the ``<locale_code>/LC_MESSAGES``
+directories containing the actual translation files.
 
 .. setting:: LOGGING
 
@@ -1447,6 +1503,25 @@ format has higher precedence and will be applied instead.
 See also :setting:`DECIMAL_SEPARATOR`, :setting:`THOUSAND_SEPARATOR` and
 :setting:`USE_THOUSAND_SEPARATOR`.
 
+.. setting:: PASSWORD_HASHERS
+
+PASSWORD_HASHERS
+----------------
+
+.. versionadded:: 1.4
+
+See :ref:`auth_password_storage`.
+
+Default::
+
+    ('django.contrib.auth.hashers.PBKDF2PasswordHasher',
+     'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+     'django.contrib.auth.hashers.BCryptPasswordHasher',
+     'django.contrib.auth.hashers.SHA1PasswordHasher',
+     'django.contrib.auth.hashers.MD5PasswordHasher',
+     'django.contrib.auth.hashers.UnsaltedMD5PasswordHasher',
+     'django.contrib.auth.hashers.CryptPasswordHasher',)
+
 .. setting:: PASSWORD_RESET_TIMEOUT_DAYS
 
 PASSWORD_RESET_TIMEOUT_DAYS
@@ -1476,7 +1551,7 @@ PROFANITIES_LIST
 Default: ``()`` (Empty tuple)
 
 A tuple of profanities, as strings, that will be forbidden in comments when
-:setting:`COMMENTS_ALLOW_PROFANITIES` is ``False``.
+``COMMENTS_ALLOW_PROFANITIES`` is ``False``.
 
 .. setting:: RESTRUCTUREDTEXT_FILTER_SETTINGS
 
@@ -1960,9 +2035,7 @@ TEST_RUNNER
 Default: ``'django.test.simple.DjangoTestSuiteRunner'``
 
 The name of the class to use for starting the test suite. See
-:doc:`/topics/testing`.
-
-.. _Testing Django Applications: ../testing/
+:ref:`other-testing-frameworks`.
 
 .. setting:: THOUSAND_SEPARATOR
 
@@ -2000,7 +2073,12 @@ See also :setting:`DATE_FORMAT` and :setting:`DATETIME_FORMAT`.
 TIME_INPUT_FORMATS
 ------------------
 
-Default: ``('%H:%M:%S', '%H:%M')``
+Default::
+
+    (
+        '%H:%M:%S',     # '14:30:59'
+        '%H:%M',        # '14:30'
+    )
 
 A tuple of formats that will be accepted when inputting data on a time field.
 Formats will be tried in order, using the first valid one. Note that these
@@ -2065,6 +2143,16 @@ to ensure your processes are running in the correct environment.
 .. _See available choices: http://www.postgresql.org/docs/8.1/static/datetime-keywords.html#DATETIME-TIMEZONE-SET-TABLE
 
 .. _pytz: http://pytz.sourceforge.net/
+
+.. setting:: TRANSACTIONS_MANAGED
+
+TRANSACTIONS_MANAGED
+--------------------
+
+Default: ``False``
+
+Set this to ``True`` if you want to :ref:`disable Django's transaction
+management <deactivate-transaction-management>` and implement your own.
 
 .. setting:: USE_ETAGS
 
@@ -2172,7 +2260,7 @@ startproject <startproject>` management command will create a simple
 ``wsgi.py`` file with an ``application`` callable in it, and point this setting
 to that ``application``.
 
-If not set, the return value of :func:`django.core.wsgi.get_wsgi_application`
+If not set, the return value of ``django.core.wsgi.get_wsgi_application()``
 will be used. In this case, the behavior of :djadmin:`runserver` will be
 identical to previous Django versions.
 
@@ -2224,7 +2312,7 @@ AUTH_PROFILE_MODULE
 Default: Not defined
 
 The site-specific user profile model used by this site. See
-:ref:`auth-profiles`.
+:ref:`User profiles <auth-profiles>`.
 
 .. setting:: IGNORABLE_404_ENDS
 
@@ -2241,12 +2329,3 @@ IGNORABLE_404_STARTS
 
 .. deprecated:: 1.4
    This setting has been superseded by :setting:`IGNORABLE_404_URLS`.
-
-.. setting:: URL_VALIDATOR_USER_AGENT
-
-URL_VALIDATOR_USER_AGENT
-------------------------
-
-.. deprecated:: 1.5
-    This value was used as the ``User-Agent`` header when checking if a URL
-    exists, a feature that was removed due to security and performance issues.

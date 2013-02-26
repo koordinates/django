@@ -30,6 +30,7 @@ from django.test.utils import (setup_test_template_loader,
 from django.utils import unittest
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils.formats import date_format
+from django.utils._os import upath
 from django.utils.translation import activate, deactivate, ugettext as _
 from django.utils.safestring import mark_safe
 from django.utils import six
@@ -52,6 +53,12 @@ except ImportError as e:
         pass # If setuptools isn't installed, that's fine. Just move on.
     else:
         raise
+
+# NumPy installed?
+try:
+    import numpy
+except ImportError:
+    numpy = False
 
 from . import filters
 
@@ -365,13 +372,19 @@ class Templates(TestCase):
         with self.assertRaises(urlresolvers.NoReverseMatch):
             t.render(c)
 
-    def test_url_explicit_exception_for_old_syntax(self):
+    def test_url_explicit_exception_for_old_syntax_at_run_time(self):
         # Regression test for #19280
         t = Template('{% url path.to.view %}')      # not quoted = old syntax
         c = Context()
-        with self.assertRaisesRegexp(urlresolvers.NoReverseMatch,
+        with six.assertRaisesRegex(self, urlresolvers.NoReverseMatch,
                 "The syntax changed in Django 1.5, see the docs."):
             t.render(c)
+
+    def test_url_explicit_exception_for_old_syntax_at_compile_time(self):
+        # Regression test for #19392
+        with six.assertRaisesRegex(self, template.TemplateSyntaxError,
+                "The syntax of 'url' changed in Django 1.5, see the docs."):
+            t = Template('{% url my-view %}')      # not a variable = old syntax
 
     @override_settings(DEBUG=True, TEMPLATE_DEBUG=True)
     def test_no_wrapped_exception(self):
@@ -423,7 +436,7 @@ class Templates(TestCase):
         # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
         old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
         settings.ALLOWED_INCLUDE_ROOTS = (
-            os.path.dirname(os.path.abspath(__file__)),
+            os.path.dirname(os.path.abspath(upath(__file__))),
         )
 
         # Warm the URL reversing cache. This ensures we don't pay the cost
@@ -514,7 +527,7 @@ class Templates(TestCase):
     def get_template_tests(self):
         # SYNTAX --
         # 'template_name': ('template contents', 'context dict', 'expected string output' or Exception class)
-        basedir = os.path.dirname(os.path.abspath(__file__))
+        basedir = os.path.dirname(os.path.abspath(upath(__file__)))
         tests = {
             ### BASIC SYNTAX ################################################
 
@@ -1642,6 +1655,17 @@ class Templates(TestCase):
             'verbatim-tag05': ('{% verbatim %}{% endverbatim %}{% verbatim %}{% endverbatim %}', {}, ''),
             'verbatim-tag06': ("{% verbatim special %}Don't {% endverbatim %} just yet{% endverbatim special %}", {}, "Don't {% endverbatim %} just yet"),
         }
+
+        if numpy:
+            tests.update({
+                # Numpy's array-index syntax allows a template to access a certain item of a subscriptable object.
+                'numpy-array-index01': ("{{ var.1 }}", {"var": numpy.array(["first item", "second item"])}, "second item"),
+
+                # Fail silently when the array index is out of range.
+                'numpy-array-index02': ("{{ var.5 }}", {"var": numpy.array(["first item", "second item"])}, ("", "INVALID")),
+            })
+
+
         return tests
 
 class TemplateTagLoading(unittest.TestCase):
@@ -1649,7 +1673,7 @@ class TemplateTagLoading(unittest.TestCase):
     def setUp(self):
         self.old_path = sys.path[:]
         self.old_apps = settings.INSTALLED_APPS
-        self.egg_dir = '%s/eggs' % os.path.dirname(__file__)
+        self.egg_dir = '%s/eggs' % os.path.dirname(upath(__file__))
         self.old_tag_modules = template_base.templatetags_modules
         template_base.templatetags_modules = []
 

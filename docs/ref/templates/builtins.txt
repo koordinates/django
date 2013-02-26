@@ -370,7 +370,7 @@ block are output::
 In the above, if ``athlete_list`` is not empty, the number of athletes will be
 displayed by the ``{{ athlete_list|length }}`` variable.
 
-As you can see, the ``if`` tag may take one or several `` {% elif %}``
+As you can see, the ``if`` tag may take one or several ``{% elif %}``
 clauses, as well as an ``{% else %}`` clause that will be displayed if all
 previous conditions fail. These clauses are optional.
 
@@ -611,7 +611,7 @@ Output the contents of the block if the two arguments equal each other.
 
 Example::
 
-    {% ifequal user.id comment.user_id %}
+    {% ifequal user.pk comment.user_id %}
         ...
     {% endifequal %}
 
@@ -857,7 +857,7 @@ an attribute "description," you could use::
     {% regroup cities by country.description as country_list %}
 
 Or, if ``country`` is a field with ``choices``, it will have a
-:meth:`^django.db.models.Model.get_FOO_display` method available as an
+:meth:`~django.db.models.Model.get_FOO_display` method available as an
 attribute, allowing  you to group on the display string rather than the
 ``choices`` key::
 
@@ -1068,11 +1068,11 @@ value to a maximum value, and then applies that ratio to a constant.
 For example::
 
     <img src="bar.png" alt="Bar"
-         height="10" width="{% widthratio this_value max_value 100 %}" />
+         height="10" width="{% widthratio this_value max_value max_width %}" />
 
-Above, if ``this_value`` is 175 and ``max_value`` is 200, the image in the
-above example will be 88 pixels wide (because 175/200 = .875; .875 * 100 = 87.5
-which is rounded up to 88).
+If ``this_value`` is 175, ``max_value`` is 200, and ``max_width`` is 100, the
+image in the above example will be 88 pixels wide
+(because 175/200 = .875; .875 * 100 = 87.5 which is rounded up to 88).
 
 .. templatetag:: with
 

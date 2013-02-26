@@ -9,6 +9,7 @@ from django.core.urlresolvers import reverse
 from django.test import LiveServerTestCase, TestCase
 from django.test.utils import override_settings
 from django.utils import six, unittest
+from django.utils._os import upath
 from django.utils.translation import override
 from django.utils.text import javascript_quote
 
@@ -24,12 +25,27 @@ class I18NTests(TestCase):
     """ Tests django views in django/views/i18n.py """
 
     def test_setlang(self):
-        """The set_language view can be used to change the session language"""
+        """
+        The set_language view can be used to change the session language.
+
+        The user is redirected to the 'next' argument if provided.
+        """
         for lang_code, lang_name in settings.LANGUAGES:
             post_data = dict(language=lang_code, next='/views/')
             response = self.client.post('/views/i18n/setlang/', data=post_data)
             self.assertRedirects(response, 'http://testserver/views/')
             self.assertEqual(self.client.session['django_language'], lang_code)
+
+    def test_setlang_unsafe_next(self):
+        """
+        The set_language view only redirects to the 'next' argument if it is
+        "safe".
+        """
+        lang_code, lang_name = settings.LANGUAGES[0]
+        post_data = dict(language=lang_code, next='//unsafe/redirection/')
+        response = self.client.post('/views/i18n/setlang/', data=post_data)
+        self.assertEqual(response['Location'], 'http://testserver/')
+        self.assertEqual(self.client.session['django_language'], lang_code)
 
     def test_setlang_reversal(self):
         self.assertEqual(reverse('set_language'), '/views/i18n/setlang/')
@@ -152,7 +168,7 @@ class JsI18NTestsMultiPackage(TestCase):
     def testI18NWithLocalePaths(self):
         extended_locale_paths = settings.LOCALE_PATHS + (
             path.join(path.dirname(
-                path.dirname(path.abspath(__file__))), 'app3', 'locale'),)
+                path.dirname(path.abspath(upath(__file__)))), 'app3', 'locale'),)
         with self.settings(LANGUAGE_CODE='es-ar', LOCALE_PATHS=extended_locale_paths):
             with override('es-ar'):
                 response = self.client.get('/views/jsi18n/')

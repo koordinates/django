@@ -21,6 +21,9 @@ MAX_NUM_FORM_COUNT = 'MAX_NUM_FORMS'
 ORDERING_FIELD_NAME = 'ORDER'
 DELETION_FIELD_NAME = 'DELETE'
 
+# default maximum number of forms in a formset, to prevent memory exhaustion
+DEFAULT_MAX_NUM = 1000
+
 class ManagementForm(Form):
     """
     ``ManagementForm`` is used to keep track of how many form instances
@@ -97,11 +100,10 @@ class BaseFormSet(object):
             total_forms = initial_forms + self.extra
             # Allow all existing related objects/inlines to be displayed,
             # but don't allow extra beyond max_num.
-            if self.max_num is not None:
-                if initial_forms > self.max_num >= 0:
-                    total_forms = initial_forms
-                elif total_forms > self.max_num >= 0:
-                    total_forms = self.max_num
+            if initial_forms > self.max_num >= 0:
+                total_forms = initial_forms
+            elif total_forms > self.max_num >= 0:
+                total_forms = self.max_num
         return total_forms
 
     def initial_form_count(self):
@@ -111,14 +113,14 @@ class BaseFormSet(object):
         else:
             # Use the length of the inital data if it's there, 0 otherwise.
             initial_forms = self.initial and len(self.initial) or 0
-            if self.max_num is not None and (initial_forms > self.max_num >= 0):
+            if initial_forms > self.max_num >= 0:
                 initial_forms = self.max_num
         return initial_forms
 
     def _construct_forms(self):
         # instantiate all the forms and put them in self.forms
         self.forms = []
-        for i in xrange(self.total_form_count()):
+        for i in xrange(min(self.total_form_count(), self.absolute_max)):
             self.forms.append(self._construct_form(i))
 
     def _construct_form(self, i, **kwargs):
@@ -157,14 +159,12 @@ class BaseFormSet(object):
         return self.forms[self.initial_form_count():]
 
     @property
-    def empty_form(self, **kwargs):
-        defaults = {
-            'auto_id': self.auto_id,
-            'prefix': self.add_prefix('__prefix__'),
-            'empty_permitted': True,
-        }
-        defaults.update(kwargs)
-        form = self.form(**defaults)
+    def empty_form(self):
+        form = self.form(
+            auto_id=self.auto_id,
+            prefix=self.add_prefix('__prefix__'),
+            empty_permitted=True,
+        )
         self.add_fields(form, None)
         return form
 
@@ -267,7 +267,7 @@ class BaseFormSet(object):
 
     def is_valid(self):
         """
-        Returns True if form.errors is empty for every form in self.forms.
+        Returns True if every form in self.forms is valid.
         """
         if not self.is_bound:
             return False
@@ -282,8 +282,7 @@ class BaseFormSet(object):
                     # This form is going to be deleted so any of its errors
                     # should not cause the entire formset to be invalid.
                     continue
-            if bool(self.errors[i]):
-                forms_valid = False
+            forms_valid &= form.is_valid()
         return forms_valid and not bool(self.non_form_errors())
 
     def full_clean(self):
@@ -336,7 +335,10 @@ class BaseFormSet(object):
         Returns True if the formset needs to be multipart, i.e. it
         has FileInput. Otherwise, False.
         """
-        return self.forms and self.forms[0].is_multipart()
+        if self.forms:
+            return self.forms[0].is_multipart()
+        else:
+            return self.empty_form.is_multipart()
 
     @property
     def media(self):
@@ -345,7 +347,7 @@ class BaseFormSet(object):
         if self.forms:
             return self.forms[0].media
         else:
-            return Media()
+            return self.empty_form.media
 
     def as_table(self):
         "Returns this formset rendered as HTML <tr>s -- excluding the <table></table>."
@@ -368,9 +370,14 @@ class BaseFormSet(object):
 def formset_factory(form, formset=BaseFormSet, extra=1, can_order=False,
                     can_delete=False, max_num=None):
     """Return a FormSet for the given form class."""
+    if max_num is None:
+        max_num = DEFAULT_MAX_NUM
+    # hard limit on forms instantiated, to prevent memory-exhaustion attacks
+    # limit defaults to DEFAULT_MAX_NUM, but developer can increase it via max_num
+    absolute_max = max(DEFAULT_MAX_NUM, max_num)
     attrs = {'form': form, 'extra': extra,
              'can_order': can_order, 'can_delete': can_delete,
-             'max_num': max_num}
+             'max_num': max_num, 'absolute_max': absolute_max}
     return type(form.__name__ + str('FormSet'), (formset,), attrs)
 
 def all_valid(formsets):

@@ -1596,7 +1596,7 @@ class AuthTestCase(TestCase):
         new_io = StringIO()
         management.call_command('dumpdata', 'auth', format='json', database='other', stdout=new_io)
         command_output = new_io.getvalue().strip()
-        self.assertTrue('"email": "alice@example.com",' in command_output)
+        self.assertTrue('"email": "alice@example.com"' in command_output)
 
 
 @override_settings(AUTH_PROFILE_MODULE='multiple_database.UserProfile')
@@ -1757,6 +1757,11 @@ class SignalTests(TestCase):
         p.delete(using="other")
         self.assertEqual(pre_delete_receiver._database, "other")
         self.assertEqual(post_delete_receiver._database, "other")
+
+        signals.pre_save.disconnect(sender=Person, receiver=pre_save_receiver)
+        signals.post_save.disconnect(sender=Person, receiver=post_save_receiver)
+        signals.pre_delete.disconnect(sender=Person, receiver=pre_delete_receiver)
+        signals.post_delete.disconnect(sender=Person, receiver=post_delete_receiver)
 
     def test_database_arg_m2m(self):
         """

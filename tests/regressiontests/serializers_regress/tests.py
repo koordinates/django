@@ -10,6 +10,7 @@ from __future__ import absolute_import, unicode_literals
 
 import datetime
 import decimal
+from django.core.serializers.xml_serializer import DTDForbidden
 
 try:
     import yaml
@@ -28,14 +29,14 @@ from django.utils.unittest import skipUnless
 
 from .models import (BooleanData, CharData, DateData, DateTimeData, EmailData,
     FileData, FilePathData, DecimalData, FloatData, IntegerData, IPAddressData,
-    GenericIPAddressData, NullBooleanData, PhoneData, PositiveIntegerData,
+    GenericIPAddressData, NullBooleanData, PositiveIntegerData,
     PositiveSmallIntegerData, SlugData, SmallData, TextData, TimeData,
-    USStateData, GenericData, Anchor, UniqueAnchor, FKData, M2MData, O2OData,
+    GenericData, Anchor, UniqueAnchor, FKData, M2MData, O2OData,
     FKSelfData, M2MSelfData, FKDataToField, FKDataToO2O, M2MIntermediateData,
     Intermediate, BooleanPKData, CharPKData, EmailPKData, FilePathPKData,
     DecimalPKData, FloatPKData, IntegerPKData, IPAddressPKData,
-    GenericIPAddressPKData, PhonePKData, PositiveIntegerPKData,
-    PositiveSmallIntegerPKData, SlugPKData, SmallPKData, USStatePKData,
+    GenericIPAddressPKData, PositiveIntegerPKData,
+    PositiveSmallIntegerPKData, SlugPKData, SmallPKData,
     AutoNowDateTimeData, ModifyingSaveData, InheritAbstractModel, BaseModel,
     ExplicitInheritBaseModel, InheritBaseModel, ProxyBaseModel,
     ProxyProxyBaseModel, BigIntegerData, LengthModel, Tag, ComplexModel,
@@ -218,8 +219,6 @@ test_data = [
     (data_obj, 100, NullBooleanData, True),
     (data_obj, 101, NullBooleanData, False),
     (data_obj, 102, NullBooleanData, None),
-    (data_obj, 110, PhoneData, "212-634-5789"),
-    (data_obj, 111, PhoneData, None),
     (data_obj, 120, PositiveIntegerData, 123456789),
     (data_obj, 121, PositiveIntegerData, None),
     (data_obj, 130, PositiveSmallIntegerData, 12),
@@ -239,9 +238,6 @@ The end."""),
     (data_obj, 162, TextData, None),
     (data_obj, 170, TimeData, datetime.time(10,42,37)),
     (data_obj, 171, TimeData, None),
-    (data_obj, 180, USStateData, "MA"),
-    (data_obj, 181, USStateData, None),
-    (data_obj, 182, USStateData, ""),
 
     (generic_obj, 200, GenericData, ['Generic Object 1', 'tag1', 'tag2']),
     (generic_obj, 201, GenericData, ['Generic Object 2', 'tag2', 'tag3']),
@@ -320,7 +316,6 @@ The end."""),
     (pk_obj, 695, GenericIPAddressPKData, "fe80:1424:2223:6cff:fe8a:2e8a:2151:abcd"),
     # (pk_obj, 700, NullBooleanPKData, True),
     # (pk_obj, 701, NullBooleanPKData, False),
-    (pk_obj, 710, PhonePKData, "212-634-5789"),
     (pk_obj, 720, PositiveIntegerPKData, 123456789),
     (pk_obj, 730, PositiveSmallIntegerPKData, 12),
     (pk_obj, 740, SlugPKData, "this-is-a-slug"),
@@ -332,7 +327,6 @@ The end."""),
 # Several of them.
 # The end."""),
 #    (pk_obj, 770, TimePKData, datetime.time(10,42,37)),
-    (pk_obj, 780, USStatePKData, "MA"),
 #     (pk_obj, 790, XMLPKData, "<foo></foo>"),
 
     (data_obj, 800, AutoNowDateTimeData, datetime.datetime(2006,6,16,10,42,37)),
@@ -550,3 +544,17 @@ for format in serializers.get_serializer_formats():
     if format != 'python':
         setattr(SerializerTests, 'test_' + format + '_serializer_stream', curry(streamTest, format))
 
+
+class XmlDeserializerSecurityTests(TestCase):
+
+    def test_no_dtd(self):
+        """
+        The XML deserializer shouldn't allow a DTD.
+
+        This is the most straightforward way to prevent all entity definitions
+        and avoid both external entities and entity-expansion attacks.
+
+        """
+        xml = '<?xml version="1.0" standalone="no"?><!DOCTYPE example SYSTEM "http://example.com/example.dtd">'
+        with self.assertRaises(DTDForbidden):
+            next(serializers.deserialize('xml', xml))

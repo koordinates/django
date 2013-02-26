@@ -11,6 +11,7 @@ from django.http import QueryDict
 from django.utils.encoding import force_text
 from django.utils.html import escape
 from django.utils.http import urlquote
+from django.utils._os import upath
 from django.test import TestCase
 from django.test.utils import override_settings
 
@@ -27,7 +28,7 @@ from django.contrib.auth.tests.utils import skipIfCustomUser
     LANGUAGE_CODE='en',
     TEMPLATE_LOADERS=global_settings.TEMPLATE_LOADERS,
     TEMPLATE_DIRS=(
-        os.path.join(os.path.dirname(__file__), 'templates'),
+        os.path.join(os.path.dirname(upath(__file__)), 'templates'),
     ),
     USE_TZ=False,
     PASSWORD_HASHERS=('django.contrib.auth.hashers.SHA1PasswordHasher',),
@@ -104,6 +105,7 @@ class PasswordResetTest(AuthViewsTestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual("staffmember@example.com", mail.outbox[0].from_email)
 
+    @override_settings(ALLOWED_HOSTS=['adminsite.com'])
     def test_admin_reset(self):
         "If the reset view is marked as being for admin, the HTTP_HOST header is used for a domain override."
         response = self.client.post('/admin_password_reset/',
@@ -247,7 +249,9 @@ class ChangePasswordTest(AuthViewsTestCase):
             'username': 'testclient',
             'password': password,
         })
-        self.assertContainsEscaped(response, AuthenticationForm.error_messages['invalid_login'])
+        self.assertContainsEscaped(response, AuthenticationForm.error_messages['invalid_login'] % {
+                'username': User._meta.get_field('username').verbose_name
+            })
 
     def logout(self):
         response = self.client.get('/logout/')

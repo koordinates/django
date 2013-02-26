@@ -1,6 +1,6 @@
 from operator import attrgetter
 
-from django.db import connection, router
+from django.db import connection, connections, router
 from django.db.backends import util
 from django.db.models import signals, get_model
 from django.db.models.fields import (AutoField, Field, IntegerField,
@@ -497,7 +497,11 @@ class ForeignRelatedObjectsDescriptor(object):
                 except (AttributeError, KeyError):
                     db = self._db or router.db_for_read(self.model, instance=self.instance)
                     qs = super(RelatedManager, self).get_query_set().using(db).filter(**self.core_filters)
-                    qs._known_related_object = (rel_field.name, self.instance)
+                    val = getattr(self.instance, attname)
+                    if val is None or val == '' and connections[db].features.interprets_empty_strings_as_nulls:
+                        # We don't want to use qs.none() here, see #19652
+                        return qs.filter(pk__in=[])
+                    qs._known_related_objects = {rel_field: {self.instance.pk: self.instance}}
                     return qs
 
             def get_prefetch_query_set(self, instances):
@@ -588,12 +592,14 @@ def create_many_related_manager(superclass, rel):
                                  "a many-to-many relationship can be used." %
                                  instance.__class__.__name__)
 
-
         def _get_fk_val(self, obj, field_name):
             """
             Returns the correct value for this relationship's foreign key. This
             might be something else than pk value when to_field is used.
             """
+            if not self.through:
+                # Make custom m2m fields with no through model defined usable.
+                return obj.pk
             fk = self.through._meta.get_field(field_name)
             if fk.rel.field_name and fk.rel.field_name != fk.rel.to._meta.pk.attname:
                 attname = fk.rel.get_related_field().get_attname()

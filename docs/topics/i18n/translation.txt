@@ -142,14 +142,22 @@ preceding the string, e.g.::
         # Translators: This message appears on the home page only
         output = ugettext("Welcome to my site.")
 
-This also works in templates with the :ttag:`comment` tag:
+The comment will then appear in the resulting ``.po`` file associated with the
+translatable contruct located below it and should also be displayed by most
+translation tools.
 
-.. code-block:: html+django
+.. note:: Just for completeness, this is the corresponding fragment of the
+    resulting ``.po`` file:
 
-    {% comment %}Translators: This is a text of the base template {% endcomment %}
+    .. code-block:: po
 
-The comment will then appear in the resulting ``.po`` file and should also be
-displayed by most translation tools.
+        #. Translators: This message appears on the home page only
+        # path/to/python/file.py:123
+        msgid "Welcome to my site."
+        msgstr ""
+
+This also works in templates. See :ref:`translator-comments-in-templates` for
+more details.
 
 Marking strings as no-op
 ------------------------
@@ -345,7 +353,7 @@ It is recommended to always provide explicit
 :attr:`~django.db.models.Options.verbose_name` and
 :attr:`~django.db.models.Options.verbose_name_plural` options rather than
 relying on the fallback English-centric and somewhat naïve determination of
-verbose names Django performs bu looking at the model's class name::
+verbose names Django performs by looking at the model's class name::
 
     from django.utils.translation import ugettext_lazy as _
 
@@ -629,6 +637,63 @@ markers<contextual-markers>` using the ``context`` keyword:
 
     {% blocktrans with name=user.username context "greeting" %}Hi {{ name }}{% endblocktrans %}
 
+.. _translator-comments-in-templates:
+
+Comments for translators in templates
+-------------------------------------
+
+Just like with :ref:`Python code <translator-comments>`, these notes for
+translators can be specified using comments, either with the :ttag:`comment`
+tag:
+
+.. code-block:: html+django
+
+    {% comment %}Translators: View verb{% endcomment %}
+    {% trans "View" %}
+
+    {% comment %}Translators: Short intro blurb{% endcomment %}
+    <p>{% blocktrans %}A multiline translatable
+    literal.{% endblocktrans %}</p>
+
+or with the ``{#`` ... ``#}`` :ref:`one-line comment constructs <template-comments>`:
+
+.. code-block:: html+django
+
+    {# Translators: Label of a button that triggers search{% endcomment #}
+    <button type="submit">{% trans "Go" %}</button>
+
+    {# Translators: This is a text of the base template #}
+    {% blocktrans %}Ambiguous translatable block of text{% endblocktrans %}
+
+.. note:: Just for completeness, these are the corresponding fragments of the
+    resulting ``.po`` file:
+
+    .. code-block:: po
+
+        #. Translators: View verb
+        # path/to/template/file.html:10
+        msgid "View"
+        msgstr ""
+
+        #. Translators: Short intro blurb
+        # path/to/template/file.html:13
+        msgid ""
+        "A multiline translatable"
+        "literal."
+        msgstr ""
+
+        # ...
+
+        #. Translators: Label of a button that triggers search
+        # path/to/template/file.html:100
+        msgid "Go"
+        msgstr ""
+
+        #. Translators:
+        # path/to/template/file.html:103
+        msgid "Ambiguous translatable block of text"
+        msgstr ""
+
 .. _template-translation-vars:
 
 Other tags
@@ -853,6 +918,52 @@ This isn't as fast as string interpolation in Python, so keep it to those
 cases where you really need it (for example, in conjunction with ``ngettext``
 to produce proper pluralizations).
 
+Note on performance
+-------------------
+
+The :func:`~django.views.i18n.javascript_catalog` view generates the catalog
+from ``.mo`` files on every request. Since its output is constant — at least
+for a given version of a site — it's a good candidate for caching.
+
+Server-side caching will reduce CPU load. It's easily implemented with the
+:func:`~django.views.decorators.cache.cache_page` decorator. To trigger cache
+invalidation when your translations change, provide a version-dependant key
+prefix, as shown in the example below, or map the view at a version-dependant
+URL.
+
+.. code-block:: python
+
+    from django.views.decorators.cache import cache_page
+    from django.views.i18n import javascript_catalog
+
+    # The value returned by get_version() must change when translations change.
+    @cache_page(86400, key_prefix='js18n-%s' % get_version())
+    def cached_javascript_catalog(request, domain='djangojs', packages=None):
+        return javascript_catalog(request, domain, packages)
+
+Client-side caching will save bandwidth and make your site load faster. If
+you're using ETags (:setting:`USE_ETAGS = True <USE_ETAGS>`), you're already
+covered. Otherwise, you can apply :ref:`conditional decorators
+<conditional-decorators>`. In the following example, the cache is invalidated
+whenever your restart your application server.
+
+.. code-block:: python
+
+    from django.utils import timezone
+    from django.views.decorators.http import last_modified
+    from django.views.i18n import javascript_catalog
+
+    last_modified_date = timezone.now()
+    @last_modified(lambda req, **kw: last_modified_date)
+    def cached_javascript_catalog(request, domain='djangojs', packages=None):
+        return javascript_catalog(request, domain, packages)
+
+You can even pre-generate the javascript catalog as part of your deployment
+procedure and serve it as a static file. This radical technique is implemented
+in django-statici18n_.
+
+.. _django-statici18n: http://django-statici18n.readthedocs.org/en/latest/
+
 .. _url-internationalization:
 
 Internationalization: in URL patterns
@@ -928,7 +1039,7 @@ function. Example::
 
     :func:`~django.conf.urls.i18n.i18n_patterns` is only allowed in your root
     URLconf. Using it within an included URLconf will throw an
-    :exc:`ImproperlyConfigured` exception.
+    :exc:`~django.core.exceptions.ImproperlyConfigured` exception.
 
 .. warning::
 
@@ -1247,6 +1358,8 @@ The ``set_language`` redirect view
 ----------------------------------
 
 .. highlightlang:: python
+
+.. currentmodule:: django.views.i18n
 
 .. function:: set_language(request)
 

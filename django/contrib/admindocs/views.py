@@ -14,6 +14,7 @@ from django.core import urlresolvers
 from django.contrib.admindocs import utils
 from django.contrib.sites.models import Site
 from django.utils.importlib import import_module
+from django.utils._os import upath
 from django.utils import six
 from django.utils.translation import ugettext as _
 from django.utils.safestring import mark_safe
@@ -61,7 +62,7 @@ def template_tag_index(request):
             for key in metadata:
                 metadata[key] = utils.parse_rst(metadata[key], 'tag', _('tag:') + tag_name)
             if library in template.builtins:
-                tag_library = None
+                tag_library = ''
             else:
                 tag_library = module_name.split('.')[-1]
             tags.append({
@@ -96,7 +97,7 @@ def template_filter_index(request):
             for key in metadata:
                 metadata[key] = utils.parse_rst(metadata[key], 'filter', _('filter:') + filter_name)
             if library in template.builtins:
-                tag_library = None
+                tag_library = ''
             else:
                 tag_library = module_name.split('.')[-1]
             filters.append({
@@ -311,7 +312,7 @@ def load_all_installed_template_libraries():
         try:
             libraries = [
                 os.path.splitext(p)[0]
-                for p in os.listdir(os.path.dirname(mod.__file__))
+                for p in os.listdir(os.path.dirname(upath(mod.__file__)))
                 if p.endswith('.py') and p[0].isalpha()
             ]
         except OSError:

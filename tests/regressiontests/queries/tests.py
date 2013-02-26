@@ -51,8 +51,8 @@ class Queries1Tests(BaseQuerysetTest):
 
         # Create these out of order so that sorting by 'id' will be different to sorting
         # by 'info'. Helps detect some problems later.
-        self.e2 = ExtraInfo.objects.create(info='e2', note=n2)
-        e1 = ExtraInfo.objects.create(info='e1', note=self.n1)
+        self.e2 = ExtraInfo.objects.create(info='e2', note=n2, value=41)
+        e1 = ExtraInfo.objects.create(info='e1', note=self.n1, value=42)
 
         self.a1 = Author.objects.create(name='a1', num=1001, extra=e1)
         self.a2 = Author.objects.create(name='a2', num=2002, extra=e1)
@@ -880,6 +880,14 @@ class Queries1Tests(BaseQuerysetTest):
             Item.objects.filter(Q(tags__name__in=['t4', 't3'])),
             [repr(i) for i in Item.objects.filter(~~Q(tags__name__in=['t4', 't3']))])
 
+    def test_ticket19672(self):
+        self.assertQuerysetEqual(
+            Report.objects.filter(Q(creator__isnull=False) &
+                                  ~Q(creator__extra__value=41)),
+            ['<Report: r1>']
+        )
+
+
 class Queries2Tests(TestCase):
     def setUp(self):
         Number.objects.create(num=4)
@@ -1028,12 +1036,12 @@ class Queries4Tests(BaseQuerysetTest):
     def test_ticket14876(self):
         q1 = Report.objects.filter(Q(creator__isnull=True) | Q(creator__extra__info='e1'))
         q2 = Report.objects.filter(Q(creator__isnull=True)) | Report.objects.filter(Q(creator__extra__info='e1'))
-        self.assertQuerysetEqual(q1, ["<Report: r1>", "<Report: r3>"])
+        self.assertQuerysetEqual(q1, ["<Report: r1>", "<Report: r3>"], ordered=False)
         self.assertEqual(str(q1.query), str(q2.query))
 
         q1 = Report.objects.filter(Q(creator__extra__info='e1') | Q(creator__isnull=True))
         q2 = Report.objects.filter(Q(creator__extra__info='e1')) | Report.objects.filter(Q(creator__isnull=True))
-        self.assertQuerysetEqual(q1, ["<Report: r1>", "<Report: r3>"])
+        self.assertQuerysetEqual(q1, ["<Report: r1>", "<Report: r3>"], ordered=False)
         self.assertEqual(str(q1.query), str(q2.query))
 
         q1 = Item.objects.filter(Q(creator=self.a1) | Q(creator__report__name='r1')).order_by()
@@ -1881,8 +1889,10 @@ class ConditionalTests(BaseQuerysetTest):
     @skipUnlessDBFeature('supports_1000_query_parameters')
     def test_ticket14244(self):
         # Test that the "in" lookup works with lists of 1000 items or more.
+        # The numbers amount is picked to force three different IN batches
+        # for Oracle, yet to be less than 2100 parameter limit for MSSQL.
+        numbers = range(2050)
         Number.objects.all().delete()
-        numbers = range(2500)
         Number.objects.bulk_create(Number(num=num) for num in numbers)
         self.assertEqual(
             Number.objects.filter(num__in=numbers[:1000]).count(),
@@ -1898,7 +1908,7 @@ class ConditionalTests(BaseQuerysetTest):
         )
         self.assertEqual(
             Number.objects.filter(num__in=numbers).count(),
-            2500
+            len(numbers)
         )
 
 

@@ -58,10 +58,11 @@ from django.utils import timezone
 DatabaseError = Database.DatabaseError
 IntegrityError = Database.IntegrityError
 
-
-# Check whether cx_Oracle was compiled with the WITH_UNICODE option.  This will
-# also be True in Python 3.0.
-if int(Database.version.split('.', 1)[0]) >= 5 and not hasattr(Database, 'UNICODE'):
+# Check whether cx_Oracle was compiled with the WITH_UNICODE option if cx_Oracle is pre-5.1. This will
+# also be True for cx_Oracle 5.1 and in Python 3.0. See #19606
+if int(Database.version.split('.', 1)[0]) >= 5 and \
+        (int(Database.version.split('.', 2)[1]) >= 1 or
+         not hasattr(Database, 'UNICODE')):
     convert_unicode = force_text
 else:
     convert_unicode = force_bytes
@@ -77,6 +78,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     can_return_id_from_insert = True
     allow_sliced_subqueries = False
     supports_subqueries_in_group_by = False
+    supports_transactions = True
     supports_timezones = False
     supports_bitwise_or = False
     can_defer_constraint_checks = True
@@ -222,7 +224,8 @@ WHEN (new.%(col_name)s IS NULL)
         if six.PY3:
             return cursor.statement
         else:
-            return cursor.statement.decode("utf-8")
+            query = cursor.statement
+            return query if isinstance(query, unicode) else query.decode("utf-8")
 
     def last_insert_id(self, cursor, table_name, pk_name):
         sq_name = self._get_sequence_name(table_name)

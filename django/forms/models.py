@@ -141,6 +141,11 @@ def fields_for_model(model, fields=None, exclude=None, widgets=None, formfield_c
     ``exclude`` is an optional list of field names. If provided, the named
     fields will be excluded from the returned fields, even if they are listed
     in the ``fields`` argument.
+
+    ``widgets`` is a dictionary of model field names mapped to a widget
+
+    ``formfield_callback`` is a callable that takes a model field and returns
+    a form field.
     """
     field_list = []
     ignored = []
@@ -371,6 +376,21 @@ class ModelForm(six.with_metaclass(ModelFormMetaclass, BaseModelForm)):
 
 def modelform_factory(model, form=ModelForm, fields=None, exclude=None,
                       formfield_callback=None,  widgets=None):
+    """
+    Returns a ModelForm containing form fields for the given model.
+
+    ``fields`` is an optional list of field names. If provided, only the named
+    fields will be included in the returned fields.
+
+    ``exclude`` is an optional list of field names. If provided, the named
+    fields will be excluded from the returned fields, even if they are listed
+    in the ``fields`` argument.
+
+    ``widgets`` is a dictionary of model field names mapped to a widget.
+
+    ``formfield_callback`` is a callable that takes a model field and returns
+    a form field.
+    """
     # Create the inner Meta class. FIXME: ideally, we should be able to
     # construct a ModelForm without creating and passing in a temporary
     # inner class.
@@ -692,7 +712,10 @@ class BaseInlineFormSet(BaseModelFormSet):
         self.rel_name = RelatedObject(self.fk.rel.to, self.model, self.fk).get_accessor_name()
         if queryset is None:
             queryset = self.model._default_manager
-        qs = queryset.filter(**{self.fk.name: self.instance})
+        if self.instance.pk:
+            qs = queryset.filter(**{self.fk.name: self.instance})
+        else:
+            qs = queryset.filter(pk__in=[])
         super(BaseInlineFormSet, self).__init__(data, files, prefix=prefix,
                                                 queryset=qs, **kwargs)
 
@@ -1033,6 +1056,8 @@ class ModelMultipleChoiceField(ModelChoiceField):
         return qs
 
     def prepare_value(self, value):
-        if hasattr(value, '__iter__') and not isinstance(value, six.text_type):
+        if (hasattr(value, '__iter__') and
+                not isinstance(value, six.text_type) and
+                not hasattr(value, '_meta')):
             return [super(ModelMultipleChoiceField, self).prepare_value(v) for v in value]
         return super(ModelMultipleChoiceField, self).prepare_value(value)

@@ -22,7 +22,7 @@ class TestCaseFixtureLoadingTests(TestCase):
         ])
 
 
-class FixtureLoadingTests(TestCase):
+class DumpDataAssertMixin(object):
 
     def _dumpdata_assert(self, args, output, format='json',
                          natural_foreign_keys=False, natural_primary_keys=False,
@@ -36,7 +36,15 @@ class FixtureLoadingTests(TestCase):
                                                       'use_base_manager': use_base_manager,
                                                       'exclude': exclude_list})
         command_output = new_io.getvalue().strip()
-        self.assertEqual(command_output, output)
+        if format == "json":
+            self.assertJSONEqual(command_output, output)
+        elif format == "xml":
+            self.assertXMLEqual(command_output, output)
+        else:
+            self.assertEqual(command_output, output)
+
+
+class FixtureLoadingTests(DumpDataAssertMixin, TestCase):
 
     def test_initial_data(self):
         # syncdb introduces 1 initial data object from initial_data.json.
@@ -231,9 +239,9 @@ class FixtureLoadingTests(TestCase):
 
     def test_ambiguous_compressed_fixture(self):
         # The name "fixture5" is ambigous, so loading it will raise an error
-        with six.assertRaisesRegex(self, management.CommandError,
-                "Multiple fixtures named 'fixture5'"):
+        with self.assertRaises(management.CommandError) as cm:
             management.call_command('loaddata', 'fixture5', verbosity=0, commit=False)
+            self.assertIn("Multiple fixtures named 'fixture5'", cm.exception.args[0])
 
     def test_db_loading(self):
         # Load db fixtures 1 and 2. These will load using the 'default' database identifier implicitly
@@ -255,9 +263,9 @@ class FixtureLoadingTests(TestCase):
         # is closed at the end of each test.
         if connection.vendor == 'mysql':
             connection.cursor().execute("SET sql_mode = 'TRADITIONAL'")
-        with six.assertRaisesRegex(self, IntegrityError,
-                "Could not load fixtures.Article\(pk=1\): .*$"):
+        with self.assertRaises(IntegrityError) as cm:
             management.call_command('loaddata', 'invalid.json', verbosity=0, commit=False)
+            self.assertIn("Could not load fixtures.Article(pk=1):", cm.exception.args[0])
 
     def test_loading_using(self):
         # Load db fixtures 1 and 2. These will load using the 'default' database identifier explicitly
@@ -295,12 +303,7 @@ class FixtureLoadingTests(TestCase):
 <django-objects version="1.0"><object pk="1" model="fixtures.category"><field type="CharField" name="title">News Stories</field><field type="TextField" name="description">Latest news stories</field></object><object pk="2" model="fixtures.article"><field type="CharField" name="headline">Poker has no place on ESPN</field><field type="DateTimeField" name="pub_date">2006-06-16T12:00:00</field></object><object pk="3" model="fixtures.article"><field type="CharField" name="headline">Time to reform copyright</field><field type="DateTimeField" name="pub_date">2006-06-16T13:00:00</field></object><object pk="1" model="fixtures.tag"><field type="CharField" name="name">copyright</field><field to="contenttypes.contenttype" name="tagged_type" rel="ManyToOneRel"><natural>fixtures</natural><natural>article</natural></field><field type="PositiveIntegerField" name="tagged_id">3</field></object><object pk="2" model="fixtures.tag"><field type="CharField" name="name">law</field><field to="contenttypes.contenttype" name="tagged_type" rel="ManyToOneRel"><natural>fixtures</natural><natural>article</natural></field><field type="PositiveIntegerField" name="tagged_id">3</field></object><object pk="1" model="fixtures.person"><field type="CharField" name="name">Django Reinhardt</field></object><object pk="2" model="fixtures.person"><field type="CharField" name="name">Stephane Grappelli</field></object><object pk="3" model="fixtures.person"><field type="CharField" name="name">Prince</field></object><object pk="10" model="fixtures.book"><field type="CharField" name="name">Achieving self-awareness of Python programs</field><field to="fixtures.person" name="authors" rel="ManyToManyRel"></field></object></django-objects>""", format='xml', natural_foreign_keys=True)
 
 
-class FixtureTransactionTests(TransactionTestCase):
-    def _dumpdata_assert(self, args, output, format='json'):
-        new_io = six.StringIO()
-        management.call_command('dumpdata', *args, **{'format': format, 'stdout': new_io})
-        command_output = new_io.getvalue().strip()
-        self.assertEqual(command_output, output)
+class FixtureTransactionTests(DumpDataAssertMixin, TransactionTestCase):
 
     @skipUnlessDBFeature('supports_forward_references')
     def test_format_discovery(self):
@@ -313,9 +316,9 @@ class FixtureTransactionTests(TransactionTestCase):
 
         # Try to load fixture 2 using format discovery; this will fail
         # because there are two fixture2's in the fixtures directory
-        with six.assertRaisesRegex(self, management.CommandError,
-                "Multiple fixtures named 'fixture2'"):
+        with self.assertRaises(management.CommandError) as cm:
             management.call_command('loaddata', 'fixture2', verbosity=0)
+            self.assertIn("Multiple fixtures named 'fixture2'", cm.exception.args[0])
 
         # object list is unaffected
         self.assertQuerysetEqual(Article.objects.all(), [
