@@ -507,10 +507,11 @@ docs </ref/contrib/csrf>` for more information.
 Error report filtering
 ~~~~~~~~~~~~~~~~~~~~~~
 
-We added two function decorators, :func:`sensitive_variables` and
-:func:`sensitive_post_parameters`, to allow designating the local variables
-and POST parameters that may contain sensitive information and should be
-filtered out of error reports.
+We added two function decorators,
+:func:`~django.views.decorators.debug.sensitive_variables` and
+:func:`~django.views.decorators.debug.sensitive_post_parameters`, to allow
+designating the local variables and POST parameters that may contain sensitive
+information and should be filtered out of error reports.
 
 All POST parameters are now systematically filtered out of error reports for
 certain views (``login``, ``password_reset_confirm``, ``password_change`` and
@@ -708,7 +709,7 @@ If you've previously used a URL path for ``ADMIN_MEDIA_PREFIX`` (e.g.
 ``/media/``) simply make sure :setting:`STATIC_URL` and :setting:`STATIC_ROOT`
 are configured and your Web server serves those files correctly. The
 development server continues to serve the admin files just like before. Read
-the :doc:`static files howto </howto/static-files>` for more details.
+the :doc:`static files howto </howto/static-files/index>` for more details.
 
 If your ``ADMIN_MEDIA_PREFIX`` is set to an specific domain (e.g.
 ``http://media.example.com/admin/``), make sure to also set your
@@ -1039,7 +1040,7 @@ removed.
 The ``open`` method of the base Storage class used to take an obscure parameter
 ``mixin`` that allowed you to dynamically change the base classes of the
 returned file object. This has been removed. In the rare case you relied on the
-`mixin` parameter, you can easily achieve the same by overriding the `open`
+``mixin`` parameter, you can easily achieve the same by overriding the ``open``
 method, like this::
 
     from django.core.files import File
