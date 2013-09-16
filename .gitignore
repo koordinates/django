@@ -6,3 +6,5 @@ dist/
 docs/_build/
 tests/coverage_html/
 tests/.coverage
+build/
+pip-log.txt
