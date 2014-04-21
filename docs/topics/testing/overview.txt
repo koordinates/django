@@ -1288,7 +1288,7 @@ or by the order of test execution.
 
 By default, fixtures are only loaded into the ``default`` database. If you are
 using multiple databases and set :attr:`multi_db=True
-<TransactionTestCase.multi_db>`, fixtures will be loaded into all databases.
+<TestCase.multi_db>`, fixtures will be loaded into all databases.
 
 URLconf configuration
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1365,7 +1365,7 @@ If ``multi_db=True``, fixtures are loaded into all databases.
 Overriding settings
 ~~~~~~~~~~~~~~~~~~~
 
-.. method:: TestCase.settings
+.. method:: TestCase.settings()
 
 .. versionadded:: 1.4
 
@@ -1488,7 +1488,7 @@ your test suite.
     failure. Similar to unittest's :meth:`~unittest.TestCase.assertRaisesRegexp`
     with the difference that ``expected_message`` isn't a regular expression.
 
-.. method:: SimpleTestCase.assertFieldOutput(self, fieldclass, valid, invalid, field_args=None, field_kwargs=None, empty_value=u'')
+.. method:: SimpleTestCase.assertFieldOutput(fieldclass, valid, invalid, field_args=None, field_kwargs=None, empty_value=u'')
 
     .. versionadded:: 1.4
 
