@@ -13,7 +13,7 @@ from django.conf import settings, global_settings
 from django.core import mail
 from django.core.exceptions import SuspiciousOperation
 from django.core.files import temp as tempfile
-from django.core.urlresolvers import reverse
+from django.core.urlresolvers import reverse, resolve
 # Register auth models with the admin.
 from django.contrib import admin
 from django.contrib.admin.exceptions import DisallowedModelAdminToField
@@ -49,7 +49,7 @@ from .models import (Article, BarAccount, CustomArticle, EmptyModel, FooAccount,
     AdminOrderedModelMethod, AdminOrderedAdminMethod, AdminOrderedCallable,
     Report, MainPrepopulated, RelatedPrepopulated, UnorderedObject,
     Simple, UndeletableObject, Choice, ShortMessage, Telegram, Thing)
-
+from . import customadmin
 
 ERROR_MESSAGE = "Please enter the correct username and password \
 for a staff account. Note that both fields may be case-sensitive."
@@ -594,6 +594,12 @@ class AdminViewBasicTest(TestCase):
         Simple.objects.create()
         with self.assertRaises(AttributeError):
             self.client.get('/test_admin/%s/admin_views/simple/' % self.urlbit)
+
+    def test_resolve_admin_views(self):
+        index_match = resolve('/test_admin/admin4/')
+        list_match = resolve('/test_admin/admin4/auth/user/')
+        self.assertIs(index_match.func.admin_site, customadmin.simple_site)
+        self.assertIsInstance(list_match.func.model_admin, customadmin.CustomPwdTemplateUserAdmin)
 
 
 @override_settings(PASSWORD_HASHERS=('django.contrib.auth.hashers.SHA1PasswordHasher',))
