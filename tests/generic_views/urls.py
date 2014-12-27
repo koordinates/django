@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from django.conf.urls import patterns, url
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 
@@ -16,6 +17,8 @@ urlpatterns = patterns('',
     # TemplateView
     (r'^template/no_template/$',
         TemplateView.as_view()),
+    url(r'^template/login_required/$',
+        login_required(TemplateView.as_view())),
     (r'^template/simple/(?P<foo>\w+)/$',
         TemplateView.as_view(template_name='generic_views/about.html')),
     (r'^template/custom/(?P<foo>\w+)/$',

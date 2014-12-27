@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import time
 
 from django.core.exceptions import ImproperlyConfigured
+from django.core.urlresolvers import resolve
 from django.http import HttpResponse
 from django.test import TestCase, RequestFactory
 from django.utils import unittest
@@ -315,6 +316,15 @@ class TemplateViewTest(TestCase):
     def test_content_type(self):
         response = self.client.get('/template/content_type/')
         self.assertEqual(response['Content-Type'], 'text/plain')
+
+    def test_resolve_view(self):
+        match = resolve('/template/content_type/')
+        self.assertIs(match.func.view_class, TemplateView)
+        self.assertEqual(match.func.view_initkwargs['content_type'], 'text/plain')
+
+    def test_resolve_login_required_view(self):
+        match = resolve('/template/login_required/')
+        self.assertIs(match.func.view_class, TemplateView)
 
 
 class RedirectViewTest(TestCase):

@@ -9,7 +9,7 @@ from django.conf import settings, global_settings
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
 from django.core.files import temp as tempfile
-from django.core.urlresolvers import get_script_prefix, reverse, set_script_prefix
+from django.core.urlresolvers import get_script_prefix, reverse, resolve, set_script_prefix
 # Register auth models with the admin.
 from django.contrib import admin
 from django.contrib.auth import get_permission_codename
@@ -53,6 +53,7 @@ from .models import (Article, BarAccount, CustomArticle, EmptyModel, FooAccount,
     AdminOrderedModelMethod, AdminOrderedAdminMethod, AdminOrderedCallable,
     Report, MainPrepopulated, RelatedPrepopulated, UnorderedObject,
     Simple, UndeletableObject, Choice, ShortMessage, Telegram, Pizza, Topping, Thing)
+from . import customadmin
 from .admin import site, site2
 
 
@@ -589,6 +590,12 @@ class AdminViewBasicTest(AdminViewBasicTestCase):
         Simple.objects.create()
         with self.assertRaises(AttributeError):
             self.client.get('/test_admin/%s/admin_views/simple/' % self.urlbit)
+
+    def test_resolve_admin_views(self):
+        index_match = resolve('/test_admin/admin4/')
+        list_match = resolve('/test_admin/admin4/auth/user/')
+        self.assertIs(index_match.func.admin_site, customadmin.simple_site)
+        self.assertIsInstance(list_match.func.model_admin, customadmin.CustomPwdTemplateUserAdmin)
 
 
 @override_settings(PASSWORD_HASHERS=('django.contrib.auth.hashers.SHA1PasswordHasher',))
