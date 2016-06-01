@@ -5,6 +5,7 @@ from django.db import migrations
 
 try:
     from django.contrib.postgres.operations import (
+        CITextExtension,
         CreateExtension, HStoreExtension, TrigramExtension, UnaccentExtension,
     )
 except ImportError:
@@ -13,6 +14,7 @@ except ImportError:
     HStoreExtension = mock.Mock()
     TrigramExtension = mock.Mock()
     UnaccentExtension = mock.Mock()
+    CITextExtension = mock.Mock()
 
 
 class Migration(migrations.Migration):
@@ -24,4 +26,5 @@ class Migration(migrations.Migration):
         HStoreExtension(),
         TrigramExtension(),
         UnaccentExtension(),
+        CITextExtension(),
     ]

@@ -1,9 +1,9 @@
 from django.db import connection, models
 
 from .fields import (
-    ArrayField, BigIntegerRangeField, DateRangeField, DateTimeRangeField,
-    FloatRangeField, HStoreField, IntegerRangeField, JSONField,
-    SearchVectorField,
+    ArrayField, BigIntegerRangeField, CITextField, DateRangeField,
+    DateTimeRangeField, FloatRangeField, HStoreField, IntegerRangeField,
+    JSONField, SearchVectorField,
 )
 
 
@@ -95,6 +95,13 @@ class Scene(models.Model):
 
 class Character(models.Model):
     name = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.name
+
+
+class CITextTestModel(PostgreSQLModel):
+    name = CITextField(primary_key=True, max_length=255)
 
     def __str__(self):
         return self.name
