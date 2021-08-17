@@ -31,14 +31,16 @@ def get_version(version=None):
     main = get_main_version(version)
 
     sub = ""
+    mapping = {"alpha": "a", "beta": "b", "rc": "rc"}
     if version[3] == "alpha" and version[4] == 0:
         git_changeset = get_git_changeset()
         if git_changeset:
             sub = ".dev%s" % git_changeset
 
-    elif version[3] != "final":
-        mapping = {"alpha": "a", "beta": "b", "rc": "rc"}
+    elif version[3] in mapping:
         sub = mapping[version[3]] + str(version[4])
+    else:
+        return f"{main}.{version[3]}{version[4] or ''}"
 
     return main + sub
 
@@ -59,7 +61,6 @@ def get_complete_version(version=None):
         from django import VERSION as version
     else:
         assert len(version) == 5
-        assert version[3] in ("alpha", "beta", "rc", "final")
 
     return version
 
