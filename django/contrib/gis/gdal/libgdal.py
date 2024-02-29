@@ -101,23 +101,23 @@ def gdal_version_info():
 
 GDAL_VERSION = gdal_version_info()
 
-# Set library error handling so as errors are logged
-CPLErrorHandler = CFUNCTYPE(None, c_int, c_int, c_char_p)
+# # Set library error handling so as errors are logged
+# CPLErrorHandler = CFUNCTYPE(None, c_int, c_int, c_char_p)
 
 
-def err_handler(error_class, error_number, message):
-    logger.error('GDAL_ERROR %d: %s', error_number, message)
+# def err_handler(error_class, error_number, message):
+#     logger.error('GDAL_ERROR %d: %s', error_number, message)
 
 
-err_handler = CPLErrorHandler(err_handler)
+# err_handler = CPLErrorHandler(err_handler)
 
 
-def function(name, args, restype):
-    func = std_call(name)
-    func.argtypes = args
-    func.restype = restype
-    return func
+# def function(name, args, restype):
+#     func = std_call(name)
+#     func.argtypes = args
+#     func.restype = restype
+#     return func
 
 
-set_error_handler = function('CPLSetErrorHandler', [CPLErrorHandler], CPLErrorHandler)
-set_error_handler(err_handler)
+# set_error_handler = function('CPLSetErrorHandler', [CPLErrorHandler], CPLErrorHandler)
+# set_error_handler(err_handler)
