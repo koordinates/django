@@ -68,3 +68,6 @@ version = {attr = "django.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["django*"]
+
+[tool.pyright]
+exclude = ["**/__pycache__", "**/build", "dist", "tests"]
